@@ -63,6 +63,21 @@ export interface PersonalNote {
   createdAt: Timestamp;
 }
 
+// === reminders (organizational privacy only — see Firestore rules) ===
+// A person's own "Lembretes" list on their Home screen. Stays visible every
+// day until completed or deleted — no recurrence logic needed, it just
+// never disappears on its own.
+export interface Reminder {
+  id: string;
+  familyId: string;
+  userId: PersonId;
+  subject: string;
+  date: string; // free text, e.g. '07/09' — matches the existing date input
+  completed: boolean;
+  createdAt: Timestamp;
+  completedAt: Timestamp | null;
+}
+
 // === apostas ===
 export type ApostaStatus = 'active' | 'closed' | 'result_posted';
 
@@ -143,7 +158,7 @@ export type PetSpecies = 'Gato' | 'Cachorro' | 'Outro';
 export interface PetNote {
   id: string;
   subject: string;
-  date: Timestamp;
+  date: string; // free text, e.g. '05/02/2026' — matches the existing date input
   createdBy: PersonId;
   createdByName: string;
   createdAt: Timestamp;

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { salvar, carregar } from '../../utils/storage';
+import { useShoppingList } from '@/hooks/useShoppingLists';
 
 interface Item {
   id: string;
@@ -16,39 +16,25 @@ interface Item {
 export default function FarmaciaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState<Item[]>([]);
+  const { items, saveItems } = useShoppingList<Item>('farmacia');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
   const [formQuantity, setFormQuantity] = useState('');
 
-  // Carregar itens ao abrir
-  useEffect(() => {
-    carregar<Item[]>('itens_farmacia').then(dados => {
-      if (dados) setItems(dados);
-    });
-  }, []);
-
-  // Salvar sempre que mudar
-  useEffect(() => {
-    salvar('itens_farmacia', items);
-  }, [items]);
-
   const handleAddItem = () => {
     if (!formName.trim()) { setModalVisible(false); return; }
-    setItems(prev => {
-      if (editingItemId) {
-        return prev.map(item => item.id === editingItemId ? { ...item, name: formName, quantity: formQuantity } : item);
-      }
-      return [...prev, { id: Date.now().toString(), name: formName, quantity: formQuantity }];
-    });
+    const nextItems = editingItemId
+      ? items.map(item => item.id === editingItemId ? { ...item, name: formName, quantity: formQuantity } : item)
+      : [...items, { id: Date.now().toString(), name: formName, quantity: formQuantity }];
+    saveItems(nextItems);
     setModalVisible(false);
     setEditingItemId(null);
     setFormName('');
     setFormQuantity('');
   };
 
-  const handleDeleteItem = (id: string) => { setItems(prev => prev.filter(item => item.id !== id)); };
+  const handleDeleteItem = (id: string) => { saveItems(items.filter(item => item.id !== id)); };
 
   const openEditModal = (item: Item) => {
     setEditingItemId(item.id); setFormName(item.name); setFormQuantity(item.quantity); setModalVisible(true);
