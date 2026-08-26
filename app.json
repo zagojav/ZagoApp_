@@ -27,8 +27,7 @@
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro",
-      "output": "static",
-      "baseUrl": "/ZagoApp_"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
