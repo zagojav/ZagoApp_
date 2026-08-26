@@ -14,13 +14,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedActivities, getActivitiesForPerson, relevantDateKeyForToday, isCompletedOnDate } from '@/hooks/useSharedActivities';
 import { OverdueTasksBanner } from '@/components/OverdueTasksBanner';
 
-
 interface PersonalTask {
   id: string;
   title: string;
   completed: boolean;
 }
-
 
 interface Note {
   id: string;
@@ -28,8 +26,7 @@ interface Note {
   date: string;
 }
 
-
-export default function GuilhermeScreen() {
+export default function LucasScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tasks, setTasks] = useState<PersonalTask[]>([]);
@@ -42,13 +39,11 @@ export default function GuilhermeScreen() {
   const [formNoteSubject, setFormNoteSubject] = useState('');
   const [formNoteDate, setFormNoteDate] = useState('');
   const { activities, toggleCompletion } = useSharedActivities();
-  const myActivities = getActivitiesForPerson(activities, 'guilherme');
-
+  const myActivities = getActivitiesForPerson(activities, 'lucas');
 
   const completedTasks = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length;
   const completionPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-
 
   // === TAREFAS PESSOAIS ===
   const handleAddTask = () => {
@@ -56,7 +51,6 @@ export default function GuilhermeScreen() {
       setTaskModalVisible(false);
       return;
     }
-
 
     setTasks(prev => {
       if (editingTaskId) {
@@ -74,12 +68,10 @@ export default function GuilhermeScreen() {
       ];
     });
 
-
     setTaskModalVisible(false);
     setEditingTaskId(null);
     setFormTaskTitle('');
   };
-
 
   const handleToggleTask = (id: string) => {
     setTasks(prev =>
@@ -87,11 +79,9 @@ export default function GuilhermeScreen() {
     );
   };
 
-
   const handleDeleteTask = (id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id));
   };
-
 
   const openTaskEditModal = (task: PersonalTask) => {
     setEditingTaskId(task.id);
@@ -99,13 +89,11 @@ export default function GuilhermeScreen() {
     setTaskModalVisible(true);
   };
 
-
   const openTaskNewModal = () => {
     setEditingTaskId(null);
     setFormTaskTitle('');
     setTaskModalVisible(true);
   };
-
 
   // === NOTAS PESSOAIS ===
   const handleAddNote = () => {
@@ -113,7 +101,6 @@ export default function GuilhermeScreen() {
       setNoteModalVisible(false);
       return;
     }
-
 
     setNotes(prev => {
       if (editingNoteId) {
@@ -133,18 +120,15 @@ export default function GuilhermeScreen() {
       ];
     });
 
-
     setNoteModalVisible(false);
     setEditingNoteId(null);
     setFormNoteSubject('');
     setFormNoteDate('');
   };
 
-
   const handleDeleteNote = (id: string) => {
     setNotes(prev => prev.filter(n => n.id !== id));
   };
-
 
   const openNoteEditModal = (note: Note) => {
     setEditingNoteId(note.id);
@@ -153,14 +137,12 @@ export default function GuilhermeScreen() {
     setNoteModalVisible(true);
   };
 
-
   const openNoteNewModal = () => {
     setEditingNoteId(null);
     setFormNoteSubject('');
     setFormNoteDate('');
     setNoteModalVisible(true);
   };
-
 
   const getMotivationalMessage = () => {
     if (totalTasks === 0) {
@@ -178,20 +160,18 @@ export default function GuilhermeScreen() {
     return '🌱 Vamos começar a conquista!';
   };
 
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerName}>Guilherme</Text>
-          <Text style={styles.headerSubtitle}>👋 Olá, Guilherme!</Text>
+          <Text style={styles.headerName}>Lucas</Text>
+          <Text style={styles.headerSubtitle}>👋 Olá, Lucas!</Text>
         </View>
       </View>
 
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <OverdueTasksBanner personId="guilherme" />
+        <OverdueTasksBanner personId="lucas" />
         {/* Card Estatísticas */}
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
@@ -204,7 +184,6 @@ export default function GuilhermeScreen() {
             <Text style={styles.statLabel}>Pendentes</Text>
           </View>
         </View>
-
 
         {/* Barra de Progresso */}
         {totalTasks > 0 && (
@@ -223,12 +202,10 @@ export default function GuilhermeScreen() {
           </View>
         )}
 
-
         {/* Mensagem Motivacional */}
         <View style={styles.motivationalCard}>
           <Text style={styles.motivationalText}>{getMotivationalMessage()}</Text>
         </View>
-
 
         {/* Seção Tarefas Pessoais */}
         <View style={styles.section}>
@@ -242,7 +219,6 @@ export default function GuilhermeScreen() {
             </TouchableOpacity>
           </View>
 
-
           {tasks.length === 0 && myActivities.length === 0 ? (
             <Text style={styles.emptyText}>Nenhuma tarefa adicionada</Text>
           ) : (
@@ -254,7 +230,7 @@ export default function GuilhermeScreen() {
                   <TouchableOpacity
                     key={activity.id}
                     style={[styles.taskItem, completed && styles.taskItemCompleted]}
-                    onPress={() => toggleCompletion(activity, dateKey, 'guilherme', 'Guilherme')}
+                    onPress={() => toggleCompletion(activity, dateKey, 'lucas', 'Lucas')}
                     activeOpacity={0.7}
                   >
                     <View style={styles.taskCheckbox}>
@@ -304,7 +280,6 @@ export default function GuilhermeScreen() {
           )}
         </View>
 
-
         {/* Seção Lembretes / Notas */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -316,7 +291,6 @@ export default function GuilhermeScreen() {
               <Text style={styles.addSmallIcon}>+</Text>
             </TouchableOpacity>
           </View>
-
 
           {notes.length === 0 ? (
             <Text style={styles.emptyText}>Nenhum lembrete adicionado</Text>
@@ -352,7 +326,6 @@ export default function GuilhermeScreen() {
           )}
         </View>
 
-
         {/* Links para Outras Abas */}
         <View style={styles.quickLinksSection}>
           <Text style={styles.sectionTitle}>🔗 Acesso Rápido</Text>
@@ -371,23 +344,22 @@ export default function GuilhermeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickLink}
-              onPress={() => router.push('/calendario/calendarioG')}
+              onPress={() => router.push('/calendario/calendarioL')}
             >
               <Text style={styles.quickLinkText}>Meu Calendário</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Foto Pensa Footer */}
+        {/* Foto Formula1 Footer */}
         <View style={styles.footerContainer}>
           <Image
-            source={require('@/assets/images/pensa.png')}
-            style={styles.pensaImage}
+            source={require('@/assets/images/formula1.png')}
+            style={styles.formula1Image}
             resizeMode="contain"
           />
         </View>
       </ScrollView>
-
 
       {/* Modal Tarefa */}
       <Modal
@@ -407,7 +379,6 @@ export default function GuilhermeScreen() {
               </TouchableOpacity>
             </View>
 
-
             <View style={styles.modalBody}>
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Descrição da Tarefa</Text>
@@ -420,7 +391,6 @@ export default function GuilhermeScreen() {
                 />
               </View>
             </View>
-
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -440,7 +410,6 @@ export default function GuilhermeScreen() {
         </View>
       </Modal>
 
-
       {/* Modal Nota */}
       <Modal
         visible={noteModalVisible}
@@ -459,7 +428,6 @@ export default function GuilhermeScreen() {
               </TouchableOpacity>
             </View>
 
-
             <View style={styles.modalBody}>
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Assunto</Text>
@@ -472,7 +440,6 @@ export default function GuilhermeScreen() {
                 />
               </View>
 
-
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Data</Text>
                 <TextInput
@@ -484,7 +451,6 @@ export default function GuilhermeScreen() {
                 />
               </View>
             </View>
-
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -504,16 +470,14 @@ export default function GuilhermeScreen() {
         </View>
       </Modal>
 
-
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // branco puro para destaque da imagem branca
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -521,7 +485,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 15,
     paddingVertical: 15,
-    backgroundColor: '#000000', // preto forte
+    backgroundColor: '#000000',
   },
   headerCenter: {
     flex: 1,
@@ -535,7 +499,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: '#FF0000',
+    color: '#BDBDBD',
     marginTop: 4,
   },
   content: {
@@ -544,7 +508,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   statsCard: {
-    backgroundColor: '#FF0000',
+    backgroundColor: '#000000',
     borderRadius: 16,
     paddingVertical: 16,
     marginBottom: 16,
@@ -559,7 +523,7 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   statNumber: {
     fontSize: 28,
@@ -577,18 +541,18 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: 'rgba(220, 20, 60, 0.2)',
+    backgroundColor: 'rgba(66, 66, 66, 0.15)',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#FF0000',
+    backgroundColor: '#424242',
   },
   progressText: {
     fontSize: 12,
-    color: '#FF0000',
+    color: '#424242',
     fontWeight: '600',
   },
   motivationalCard: {
@@ -597,7 +561,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF0000',
+    borderLeftColor: '#000000',
   },
   motivationalText: {
     fontSize: 13,
@@ -623,7 +587,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FF0000',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -656,14 +620,14 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#FF0000',
+    borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   taskCheckmark: {
     fontSize: 12,
-    color: '#FF0000',
+    color: '#000000',
     fontWeight: 'bold',
   },
   taskText: {
@@ -672,15 +636,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000000',
   },
-  taskTextCompleted: {
-    color: '#999999',
-    textDecorationLine: 'line-through',
-  },
   orgTaskBadge: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FF0000',
+    color: '#424242',
     marginTop: 2,
+  },
+  taskTextCompleted: {
+    color: '#999999',
+    textDecorationLine: 'line-through',
   },
   taskEditBtn: {
     marginRight: 8,
@@ -702,7 +666,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#E0E0E0',
   },
   tableHeaderText: {
     fontSize: 11,
@@ -742,7 +706,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     borderLeftWidth: 3,
-    borderLeftColor: '#FF0000',
+    borderLeftColor: '#000000',
   },
   quickLinkText: {
     fontSize: 14,
@@ -755,7 +719,7 @@ const styles = StyleSheet.create({
     marginVertical: 30,
     backgroundColor: '#FFFFFF',
   },
-  pensaImage: {
+  formula1Image: {
     width: '100%',
     height: 270,
   },
@@ -834,7 +798,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#FF0000',
+    backgroundColor: '#000000',
     alignItems: 'center',
   },
   confirmBtnText: {

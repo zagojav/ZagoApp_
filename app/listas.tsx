@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const initialLists = [
   { id: 1, name: 'Mercado' },
@@ -15,8 +16,8 @@ const initialLists = [
 
 export default function ListasScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [lists] = useState(initialLists);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleListPress = (name: string) => {
     if (name === 'Mercado') {
@@ -28,13 +29,7 @@ export default function ListasScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setMenuOpen(true)}
-        >
-          <Text style={styles.backIcon}>☰</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Text style={styles.headerTitle}>Listas</Text>
       </View>
 
@@ -53,53 +48,6 @@ export default function ListasScreen() {
         </View>
       </ScrollView>
 
-      {/* Menu lateral */}
-      {menuOpen && (
-        <TouchableOpacity
-          style={styles.overlay}
-          onPress={() => setMenuOpen(false)}
-          activeOpacity={1}
-        >
-          <View style={styles.sideMenu}>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setMenuOpen(false)}
-            >
-              <Text style={styles.closeIcon}>✕</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/home');
-              }}
-            >
-              <Text style={styles.menuText}>Página Inicial</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/pets');
-              }}
-            >
-              <Text style={styles.menuText}>Pets</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/afazeres');
-              }}
-            >
-              <Text style={styles.menuText}>Afazeres de casa</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -115,17 +63,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#a89080',
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  backButton: {
-    padding: 10,
-    marginRight: 15,
-    backgroundColor: '#d4c5b9',
-    borderRadius: 8,
-  },
-  backIcon: { 
-    fontSize: 25, 
-    color: '#2a2a2a', 
-    fontWeight: 'bold' 
   },
   headerTitle: {
     fontSize: 24,
@@ -159,42 +96,5 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#2a2a2a',
     fontStyle: 'italic',
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  sideMenu: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '65%',
-    height: '100%',
-    backgroundColor: '#6f5947',
-    paddingTop: 20,
-  },
-  closeBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  closeIcon: {
-    fontSize: 28,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  menuItem: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '500',
   },
 });

@@ -1,86 +1,187 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, Modal, Alert,
+  TextInput, Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { salvar, carregar } from '../utils/storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useActiveProfile } from '@/hooks/useActiveProfile';
+import {
+  useSharedActivities,
+  relevantDateKeyForToday,
+  isCompletedOnDate,
+  getOccurrenceHistory,
+  getOverdueForCreator,
+  type ActivityOccurrence,
+} from '@/hooks/useSharedActivities';
+import { normalizeDateInput } from '@/utils/dates';
+import { showAlert, showConfirm } from '@/utils/alert';
+import { salvar, carregar } from '@/utils/storage';
+import { notifyMissedTask } from '@/services/notifications';
+import { PERSON_ORDER, PERSON_PROFILES } from '@/constants/personProfiles';
+import type { ActivityFrequency, PersonId, SharedActivity } from '@/types/database';
 
-interface Task {
-  id: string;
-  title: string;
-  category: string;
-  responsible: string;
-  dueDate: string;
-  completed: boolean;
+const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const NOTIFIED_MISSED_KEY = 'notifiedMissedOccurrences';
+
+function frequencyLabel(activity: SharedActivity): string {
+  if (activity.frequency === 'once') return activity.date ?? '—';
+  if (activity.frequency === 'daily') return 'Todo dia';
+  const daysOfWeek = activity.daysOfWeek ?? [];
+  if (daysOfWeek.length === 0) return 'Semanalmente';
+  return daysOfWeek
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => `Toda ${WEEKDAY_LABELS[d]}`)
+    .join(', ');
 }
 
-const CATEGORIES = ['Limpeza', 'Compras', 'Cozinha', 'Reparos', 'Outro'];
-const PEOPLE = ['Amanda', 'Guilherme', 'Renata', 'Vander'];
+function occurrenceLabel(occurrence: ActivityOccurrence): string {
+  const weekday = WEEKDAY_LABELS[occurrence.date.getDay()];
+  const day = String(occurrence.date.getDate()).padStart(2, '0');
+  const month = String(occurrence.date.getMonth() + 1).padStart(2, '0');
+  return `${weekday}, ${day}/${month}`;
+}
+
+function occurrenceStatusIcon(status: ActivityOccurrence['status']): string {
+  if (status === 'completed') return '✅';
+  if (status === 'missed') return '❌';
+  return '⏳';
+}
+
+function occurrenceStatusDetail(occurrence: ActivityOccurrence): string {
+  if (occurrence.status === 'missed') return 'não concluído';
+  if (occurrence.status === 'pending') return 'pendente';
+  const completion = occurrence.completion;
+  if (!completion) return 'concluído';
+  const time = completion.completedAt?.toDate
+    ? completion.completedAt.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const who = completion.completedByName ? ` por ${completion.completedByName}` : '';
+  return time ? `concluído${who} às ${time}` : `concluído${who}`;
+}
 
 export default function AfazeresScreen() {
-  const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { activeProfileId } = useActiveProfile();
+  const { activities, loading, addActivity, deleteActivity, toggleCompletion } = useSharedActivities();
+
   const [modalVisible, setModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [filterCategory, setFilterCategory] = useState('Todas');
-  const [filterResponsible, setFilterResponsible] = useState('Todos');
-  const [filterStatus, setFilterStatus] = useState('Todas');
+  const [filterResponsible, setFilterResponsible] = useState<PersonId | 'Todos'>('Todos');
+  const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Concluído'>('Todas');
+
   const [formTitle, setFormTitle] = useState('');
-  const [formCategory, setFormCategory] = useState(CATEGORIES[0]);
-  const [formResponsible, setFormResponsible] = useState(PEOPLE[0]);
+  const [formAssignedTo, setFormAssignedTo] = useState<PersonId>(PERSON_ORDER[0]);
+  const [formFrequency, setFormFrequency] = useState<ActivityFrequency>('once');
+  const [formDaysOfWeek, setFormDaysOfWeek] = useState<number[]>([]);
   const [formDate, setFormDate] = useState('');
+  const [trackingActivity, setTrackingActivity] = useState<SharedActivity | null>(null);
 
-  // Carregar tarefas ao abrir
+  const activeProfile = activeProfileId ? PERSON_PROFILES[activeProfileId] : null;
+
+  // Runs whenever Afazeres is opened: for every recurring task the current
+  // profile created for someone else, check for occurrences that already
+  // passed without a completion recorded, and fire a local notification —
+  // once per missed occurrence, tracked in AsyncStorage so re-opening the
+  // screen doesn't re-notify for the same date.
   useEffect(() => {
-    carregar<Task[]>('tarefas').then(dados => {
-      if (dados) setTasks(dados);
+    if (!activeProfileId || loading) return;
+    const overdue = getOverdueForCreator(activities, activeProfileId);
+    if (overdue.length === 0) return;
+
+    (async () => {
+      const notified = (await carregar<string[]>(NOTIFIED_MISSED_KEY)) ?? [];
+      const notifiedSet = new Set(notified);
+      let changed = false;
+
+      for (const { activity, missedDates } of overdue) {
+        const responsibleName = activity.assignedTo ? PERSON_PROFILES[activity.assignedTo].name : '';
+        for (const dateKey of missedDates) {
+          const flagKey = `${activity.id}|${dateKey}`;
+          if (notifiedSet.has(flagKey)) continue;
+          notifiedSet.add(flagKey);
+          changed = true;
+          await notifyMissedTask(responsibleName, activity.title, dateKey);
+        }
+      }
+
+      if (changed) {
+        await salvar(NOTIFIED_MISSED_KEY, Array.from(notifiedSet));
+      }
+    })();
+  }, [activities, activeProfileId, loading]);
+
+  const filteredActivities = useMemo(() => {
+    return activities.filter((activity) => {
+      const title = activity.title?.toLowerCase() ?? '';
+      const search = searchText.toLowerCase();
+      const matchesSearch = title.includes(search);
+      const matchesResponsible = filterResponsible === 'Todos' || activity.assignedTo === filterResponsible;
+      const completedToday = isCompletedOnDate(activity, relevantDateKeyForToday(activity));
+      const matchesStatus =
+        filterStatus === 'Todas' ||
+        (filterStatus === 'Concluído' && completedToday) ||
+        (filterStatus === 'Pendente' && !completedToday);
+      return matchesSearch && matchesResponsible && matchesStatus;
     });
-  }, []);
+  }, [activities, searchText, filterResponsible, filterStatus]);
 
-  // Salvar sempre que mudar
-  useEffect(() => {
-    salvar('tarefas', tasks);
-  }, [tasks]);
+  const resetForm = () => {
+    setFormTitle('');
+    setFormAssignedTo(PERSON_ORDER[0]);
+    setFormFrequency('once');
+    setFormDaysOfWeek([]);
+    setFormDate('');
+  };
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const matchesSearch = task.title.toLowerCase().includes(searchText.toLowerCase());
-      const matchesCategory = filterCategory === 'Todas' || task.category === filterCategory;
-      const matchesResponsible = filterResponsible === 'Todos' || task.responsible === filterResponsible;
-      const matchesStatus = filterStatus === 'Todas' || (filterStatus === 'Concluído' && task.completed) || (filterStatus === 'Pendente' && !task.completed);
-      return matchesSearch && matchesCategory && matchesResponsible && matchesStatus;
+  const toggleFormDay = (day: number) => {
+    setFormDaysOfWeek((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
+  const handleAddActivity = async () => {
+    if (!formTitle.trim()) {
+      showAlert('Erro', 'Por favor, preencha o título da tarefa');
+      return;
+    }
+    if (formFrequency === 'once' && !normalizeDateInput(formDate)) {
+      showAlert('Erro', 'Informe uma data válida (DD/MM/AAAA)');
+      return;
+    }
+    if (formFrequency === 'weekly' && formDaysOfWeek.length === 0) {
+      showAlert('Erro', 'Selecione ao menos um dia da semana');
+      return;
+    }
+    if (!activeProfileId || !activeProfile) return;
+
+    await addActivity({
+      title: formTitle,
+      description: '',
+      assignedTo: formAssignedTo,
+      frequency: formFrequency,
+      daysOfWeek: formFrequency === 'weekly' ? formDaysOfWeek : [],
+      date: formFrequency === 'once' ? normalizeDateInput(formDate) : null,
+      createdBy: activeProfileId,
+      createdByName: activeProfile.name,
     });
-  }, [tasks, searchText, filterCategory, filterResponsible, filterStatus]);
-
-  const handleAddTask = () => {
-    if (!formTitle.trim()) { Alert.alert('Erro', 'Por favor, preencha o título da tarefa'); return; }
-    const newTask: Task = { id: Date.now().toString(), title: formTitle, category: formCategory, responsible: formResponsible, dueDate: formDate, completed: false };
-    setTasks([...tasks, newTask]);
     resetForm();
     setModalVisible(false);
   };
 
-  const handleToggleTask = (id: string) => {
-    setTasks(tasks.map(task => task.id === id ? { ...task, completed: !task.completed } : task));
+  const handleToggle = (activity: SharedActivity) => {
+    if (!activeProfileId || !activeProfile) return;
+    toggleCompletion(activity, relevantDateKeyForToday(activity), activeProfileId, activeProfile.name);
   };
 
-  const handleDeleteTask = (id: string) => { setTasks(prev => prev.filter(task => task.id !== id)); };
-
-  const resetForm = () => { setFormTitle(''); setFormCategory(CATEGORIES[0]); setFormResponsible(PEOPLE[0]); setFormDate(''); };
-
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = { Limpeza: '#c8e6c9', Compras: '#bbdefb', Cozinha: '#ffe0b2', Reparos: '#f8bbd0', Outro: '#e1bee7' };
-    return colors[category] || '#e8dcc8';
+  const handleDelete = (id: string) => {
+    showConfirm(
+      { title: 'Excluir tarefa', message: 'Tem certeza que deseja excluir esta tarefa?', confirmText: 'Excluir', destructive: true },
+      () => deleteActivity(id)
+    );
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)}>
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Text style={styles.headerTitle}>Afazeres</Text>
         <TouchableOpacity style={styles.addBtn} onPress={() => setModalVisible(true)}>
           <Text style={styles.addIcon}>+</Text>
@@ -94,59 +195,98 @@ export default function AfazeresScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll} contentContainerStyle={styles.filtersContent}>
         <View style={styles.filterGroup}>
           <Text style={styles.filterLabel}>Status:</Text>
-          {['Todas', 'Pendente', 'Concluído'].map(status => (
+          {(['Todas', 'Pendente', 'Concluído'] as const).map((status) => (
             <TouchableOpacity key={status} style={[styles.filterBtn, filterStatus === status && styles.filterBtnActive]} onPress={() => setFilterStatus(status)}>
               <Text style={[styles.filterBtnText, filterStatus === status && styles.filterBtnTextActive]}>{status}</Text>
             </TouchableOpacity>
           ))}
         </View>
         <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Categoria:</Text>
-          {['Todas', ...CATEGORIES].map(cat => (
-            <TouchableOpacity key={cat} style={[styles.filterBtn, filterCategory === cat && styles.filterBtnActive]} onPress={() => setFilterCategory(cat)}>
-              <Text style={[styles.filterBtnText, filterCategory === cat && styles.filterBtnTextActive]}>{cat}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={styles.filterGroup}>
           <Text style={styles.filterLabel}>Responsável:</Text>
-          {['Todos', ...PEOPLE].map(person => (
-            <TouchableOpacity key={person} style={[styles.filterBtn, filterResponsible === person && styles.filterBtnActive]} onPress={() => setFilterResponsible(person)}>
-              <Text style={[styles.filterBtnText, filterResponsible === person && styles.filterBtnTextActive]}>{person}</Text>
+          <TouchableOpacity style={[styles.filterBtn, filterResponsible === 'Todos' && styles.filterBtnActive]} onPress={() => setFilterResponsible('Todos')}>
+            <Text style={[styles.filterBtnText, filterResponsible === 'Todos' && styles.filterBtnTextActive]}>Todos</Text>
+          </TouchableOpacity>
+          {PERSON_ORDER.map((id) => (
+            <TouchableOpacity key={id} style={[styles.filterBtn, filterResponsible === id && styles.filterBtnActive]} onPress={() => setFilterResponsible(id)}>
+              <Text style={[styles.filterBtnText, filterResponsible === id && styles.filterBtnTextActive]}>{PERSON_PROFILES[id].name}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
       <ScrollView style={styles.tasksList}>
-        {filteredTasks.length === 0 ? (
+        {!loading && filteredActivities.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Nenhuma tarefa encontrada</Text>
-            {tasks.length > 0 && <Text style={styles.emptySubtext}>Tente ajustar os filtros</Text>}
+            {activities.length > 0 && <Text style={styles.emptySubtext}>Tente ajustar os filtros</Text>}
           </View>
         ) : (
-          filteredTasks.map(task => (
-            <View key={task.id} style={[styles.taskCard, task.completed && styles.taskCardCompleted]}>
-              <TouchableOpacity style={styles.taskContent} onPress={() => handleToggleTask(task.id)}>
-                <View style={styles.taskCheckbox}>{task.completed && <Text style={styles.checkmark}>✓</Text>}</View>
-                <View style={styles.taskInfo}>
-                  <Text style={[styles.taskTitle, task.completed && styles.taskTitleCompleted]}>{task.title}</Text>
-                  <View style={styles.taskMeta}>
-                    <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(task.category) }]}>
-                      <Text style={styles.categoryText}>{task.category}</Text>
-                    </View>
-                    <Text style={styles.responsibleText}>👤 {task.responsible}</Text>
-                    {task.dueDate && <Text style={styles.dateText}>📅 {task.dueDate}</Text>}
+          filteredActivities.map((activity) => {
+            const responsible = activity.assignedTo ? PERSON_PROFILES[activity.assignedTo] : null;
+            const completedToday = isCompletedOnDate(activity, relevantDateKeyForToday(activity));
+            const canTrack = activeProfileId === activity.createdBy && activity.createdBy !== activity.assignedTo;
+            return (
+              <View key={activity.id} style={[styles.taskCard, completedToday && styles.taskCardCompleted]}>
+                <TouchableOpacity style={styles.taskContent} onPress={() => handleToggle(activity)}>
+                  <View style={[styles.taskCheckbox, responsible && { borderColor: responsible.colors.primary }]}>
+                    {completedToday && <Text style={styles.checkmark}>✓</Text>}
                   </View>
+                  <View style={styles.taskInfo}>
+                    <Text style={[styles.taskTitle, completedToday && styles.taskTitleCompleted]}>{activity.title}</Text>
+                    <View style={styles.taskMeta}>
+                      {responsible && (
+                        <View style={[styles.responsibleBadge, { backgroundColor: responsible.colors.primary }]}>
+                          <Text style={[styles.responsibleBadgeText, { color: responsible.colors.secondary }]}>{responsible.name}</Text>
+                        </View>
+                      )}
+                      <Text style={styles.dateText}>🔁 {frequencyLabel(activity)}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+                <View style={styles.taskActions}>
+                  {canTrack && (
+                    <TouchableOpacity style={styles.trackBtn} onPress={() => setTrackingActivity(activity)}>
+                      <Text style={styles.trackIcon}>📊</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(activity.id)}>
+                    <Text style={styles.deleteIcon}>🗑️</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteTask(task.id)}>
-                <Text style={styles.deleteIcon}>🗑️</Text>
-              </TouchableOpacity>
-            </View>
-          ))
+              </View>
+            );
+          })
         )}
       </ScrollView>
+
+      <Modal visible={trackingActivity !== null} transparent animationType="slide" onRequestClose={() => setTrackingActivity(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Acompanhamento</Text>
+              <TouchableOpacity onPress={() => setTrackingActivity(null)}><Text style={styles.closeModal}>✕</Text></TouchableOpacity>
+            </View>
+            {trackingActivity && (
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <Text style={styles.trackingTitle}>{trackingActivity.title}</Text>
+                <Text style={styles.trackingSubtitle}>
+                  Responsável: {trackingActivity.assignedTo ? PERSON_PROFILES[trackingActivity.assignedTo].name : '—'}
+                </Text>
+                {getOccurrenceHistory(trackingActivity)
+                  .slice()
+                  .reverse()
+                  .map((occurrence) => (
+                    <View key={occurrence.dateKey} style={styles.occurrenceRow}>
+                      <Text style={styles.occurrenceIcon}>{occurrenceStatusIcon(occurrence.status)}</Text>
+                      <Text style={styles.occurrenceLabel}>{occurrenceLabel(occurrence)}</Text>
+                      <Text style={styles.occurrenceStatus}>{occurrenceStatusDetail(occurrence)}</Text>
+                    </View>
+                  ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -160,49 +300,74 @@ export default function AfazeresScreen() {
                 <Text style={styles.formLabel}>Título *</Text>
                 <TextInput style={styles.formInput} placeholder="O que precisa ser feito?" value={formTitle} onChangeText={setFormTitle} placeholderTextColor="#ccc" />
               </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Categoria</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                  {CATEGORIES.map(cat => (
-                    <TouchableOpacity key={cat} style={[styles.categoryOption, formCategory === cat && styles.categoryOptionActive]} onPress={() => setFormCategory(cat)}>
-                      <Text style={[styles.categoryOptionText, formCategory === cat && styles.categoryOptionTextActive]}>{cat}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Responsável</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.peopleScroll}>
-                  {PEOPLE.map(person => (
-                    <TouchableOpacity key={person} style={[styles.peopleOption, formResponsible === person && styles.peopleOptionActive]} onPress={() => setFormResponsible(person)}>
-                      <Text style={[styles.peopleOptionText, formResponsible === person && styles.peopleOptionTextActive]}>{person}</Text>
+                  {PERSON_ORDER.map((id) => (
+                    <TouchableOpacity
+                      key={id}
+                      style={[styles.peopleOption, formAssignedTo === id && { backgroundColor: PERSON_PROFILES[id].colors.primary }]}
+                      onPress={() => setFormAssignedTo(id)}
+                    >
+                      <Text style={[styles.peopleOptionText, formAssignedTo === id && { color: PERSON_PROFILES[id].colors.secondary }]}>
+                        {PERSON_PROFILES[id].name}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
+
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Data (opcional)</Text>
-                <TextInput style={styles.formInput} placeholder="DD/MM/YYYY" value={formDate} onChangeText={setFormDate} placeholderTextColor="#ccc" />
+                <Text style={styles.formLabel}>Frequência</Text>
+                <View style={styles.frequencyRow}>
+                  {([
+                    ['once', 'Uma vez'],
+                    ['daily', 'Diariamente'],
+                    ['weekly', 'Semanalmente'],
+                  ] as const).map(([value, label]) => (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.categoryOption, formFrequency === value && styles.categoryOptionActive]}
+                      onPress={() => setFormFrequency(value)}
+                    >
+                      <Text style={[styles.categoryOptionText, formFrequency === value && styles.categoryOptionTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
+
+              {formFrequency === 'once' && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Data</Text>
+                  <TextInput style={styles.formInput} placeholder="DD/MM/AAAA" value={formDate} onChangeText={setFormDate} placeholderTextColor="#ccc" />
+                </View>
+              )}
+
+              {formFrequency === 'weekly' && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Dias da semana</Text>
+                  <View style={styles.frequencyRow}>
+                    {WEEKDAY_LABELS.map((label, index) => (
+                      <TouchableOpacity
+                        key={label}
+                        style={[styles.categoryOption, formDaysOfWeek.includes(index) && styles.categoryOptionActive]}
+                        onPress={() => toggleFormDay(index)}
+                      >
+                        <Text style={[styles.categoryOptionText, formDaysOfWeek.includes(index) && styles.categoryOptionTextActive]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
             </ScrollView>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }}><Text style={styles.cancelBtnText}>Cancelar</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleAddTask}><Text style={styles.confirmBtnText}>Adicionar</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} onPress={handleAddActivity}><Text style={styles.confirmBtnText}>Adicionar</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
-      {menuOpen && (
-        <TouchableOpacity style={styles.overlay} onPress={() => setMenuOpen(false)} activeOpacity={1}>
-          <View style={styles.sideMenu}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setMenuOpen(false)}><Text style={styles.closeIcon}>✕</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); router.push('/home'); }}><Text style={styles.menuText}>Página Inicial</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); router.push('/listas'); }}><Text style={styles.menuText}>Listas</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); router.push('/pets'); }}><Text style={styles.menuText}>Pets</Text></TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -210,10 +375,8 @@ export default function AfazeresScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#a89080' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15, backgroundColor: '#a89080' },
-  menuBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#d4c5b9', justifyContent: 'center', alignItems: 'center' },
-  menuIcon: { fontSize: 24, color: '#2a2a2a', fontWeight: 'bold' },
   headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#2a2a2a', letterSpacing: 1 },
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#c9a876', justifyContent: 'center', alignItems: 'center' },
+  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#c9a876', justifyContent: 'center', alignItems: 'center', marginRight: 44 },
   addIcon: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
   searchContainer: { paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#a89080' },
   searchInput: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, fontSize: 14, color: '#2a2a2a' },
@@ -238,12 +401,20 @@ const styles = StyleSheet.create({
   taskTitle: { fontSize: 15, fontWeight: '600', color: '#2a2a2a', marginBottom: 6 },
   taskTitleCompleted: { color: '#999', textDecorationLine: 'line-through' },
   taskMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  categoryBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  categoryText: { fontSize: 11, fontWeight: '600', color: '#2a2a2a' },
-  responsibleText: { fontSize: 11, color: '#666' },
+  responsibleBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  responsibleBadgeText: { fontSize: 11, fontWeight: '600' },
   dateText: { fontSize: 11, color: '#999' },
+  taskActions: { flexDirection: 'row', alignItems: 'center' },
+  trackBtn: { padding: 8 },
+  trackIcon: { fontSize: 16 },
   deleteBtn: { padding: 8 },
   deleteIcon: { fontSize: 18 },
+  trackingTitle: { fontSize: 17, fontWeight: '700', color: '#2a2a2a', marginBottom: 4 },
+  trackingSubtitle: { fontSize: 13, color: '#666', marginBottom: 16 },
+  occurrenceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  occurrenceIcon: { fontSize: 16, marginRight: 10 },
+  occurrenceLabel: { fontSize: 13, fontWeight: '600', color: '#2a2a2a', width: 80 },
+  occurrenceStatus: { fontSize: 12, color: '#666', flex: 1 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', paddingBottom: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
@@ -253,25 +424,17 @@ const styles = StyleSheet.create({
   formGroup: { marginBottom: 20 },
   formLabel: { fontSize: 14, fontWeight: '600', color: '#2a2a2a', marginBottom: 8 },
   formInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#2a2a2a' },
-  categoryScroll: { marginHorizontal: -20, paddingHorizontal: 20 },
-  categoryOption: { marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f0f0f0' },
+  frequencyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f0f0f0' },
   categoryOptionActive: { backgroundColor: '#c9a876' },
   categoryOptionText: { fontSize: 13, fontWeight: '500', color: '#2a2a2a' },
   categoryOptionTextActive: { color: '#fff' },
   peopleScroll: { marginHorizontal: -20, paddingHorizontal: 20 },
   peopleOption: { marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f0f0f0' },
-  peopleOptionActive: { backgroundColor: '#c9a876' },
   peopleOptionText: { fontSize: 13, fontWeight: '500', color: '#2a2a2a' },
-  peopleOptionTextActive: { color: '#fff' },
   modalActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
   cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#2a2a2a' },
   confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#c9a876', alignItems: 'center' },
   confirmBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  sideMenu: { position: 'absolute', top: 0, left: 0, width: '65%', height: '100%', backgroundColor: '#6f5947', paddingTop: 20 },
-  closeBtn: { paddingHorizontal: 20, paddingVertical: 10 },
-  closeIcon: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
-  menuItem: { paddingVertical: 15, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.2)' },
-  menuText: { fontSize: 16, color: '#fff', fontWeight: '500' },
 });

@@ -4,6 +4,7 @@ import {
   TextInput, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { salvar, carregar } from '../../utils/storage';
 
 interface Item {
@@ -14,6 +15,7 @@ interface Item {
 
 export default function FarmaciaScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Item[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function FarmaciaScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>

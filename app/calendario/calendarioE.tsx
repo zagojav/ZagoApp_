@@ -16,7 +16,7 @@ interface Event {
   time: string;
 }
 
-export default function CalendarioGuilhermeScreen() {
+export default function CalendarioEmanuellaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 7));
@@ -30,18 +30,18 @@ export default function CalendarioGuilhermeScreen() {
   const [formDescription, setFormDescription] = useState('');
   const [formTime, setFormTime] = useState('');
   const { activities, toggleCompletion } = useSharedActivities();
-  const myActivities = getActivitiesForPerson(activities, 'guilherme');
+  const myActivities = getActivitiesForPerson(activities, 'emanuella');
 
   // Carregar eventos ao abrir
   useEffect(() => {
-    carregar<Event[]>('calendario_guilherme').then(dados => {
+    carregar<Event[]>('calendario_emanuella').then(dados => {
       if (dados) setEvents(dados);
     });
   }, []);
 
   // Salvar sempre que mudar
   useEffect(() => {
-    salvar('calendario_guilherme', events);
+    salvar('calendario_emanuella', events);
   }, [events]);
 
   const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -89,7 +89,7 @@ export default function CalendarioGuilhermeScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Calendário Guilherme</Text>
+        <Text style={styles.headerTitle}>Calendário Emanuella</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -178,7 +178,7 @@ export default function CalendarioGuilhermeScreen() {
                       <TouchableOpacity
                         key={activity.id}
                         style={styles.activityRow}
-                        onPress={() => toggleCompletion(activity, selectedDate, 'guilherme', 'Guilherme')}
+                        onPress={() => toggleCompletion(activity, selectedDate, 'emanuella', 'Emanuella')}
                       >
                         <View style={[styles.activityCheckbox, completed && styles.activityCheckboxDone]}>
                           {completed && <Text style={styles.activityCheckmark}>✓</Text>}
@@ -247,49 +247,49 @@ export default function CalendarioGuilhermeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15, backgroundColor: '#000000' },
-  backBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#FF0000', justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15, backgroundColor: '#E83E8C' },
+  backBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#F06292', justifyContent: 'center', alignItems: 'center' },
   backIcon: { fontSize: 24, color: '#fff', fontWeight: 'bold' },
   headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#fff', letterSpacing: 1 },
   content: { flex: 1, paddingHorizontal: 10, paddingVertical: 15 },
-  monthSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15, backgroundColor: '#FF0000', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12 },
+  monthSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15, backgroundColor: '#E83E8C', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12 },
   monthArrow: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   arrowText: { fontSize: 22, color: '#fff', fontWeight: 'bold' },
-  monthYearContainer: { backgroundColor: '#000000', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  monthYearText: { fontSize: 14, fontWeight: '600', color: '#FF0000' },
+  monthYearContainer: { backgroundColor: '#C71A6C', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  monthYearText: { fontSize: 14, fontWeight: '600', color: '#FCE4EC' },
   weekDaysContainer: { flexDirection: 'row', marginBottom: 6 },
   weekDayCell: { flex: 1, paddingVertical: 8 },
   weekDayText: { textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#000000' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 },
-  calendarDay: { width: '14.28%', aspectRatio: 1, backgroundColor: '#F5F5F5', borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)', margin: 1, padding: 4 },
+  calendarDay: { width: '14.28%', aspectRatio: 1, backgroundColor: '#FCE4EC', borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(233, 30, 99, 0.1)', margin: 1, padding: 4 },
   emptyDay: { backgroundColor: 'transparent', borderWidth: 0 },
-  todayDay: { backgroundColor: '#FF0000', borderColor: '#FF0000' },
-  eventDay: { backgroundColor: '#FFFFFF', borderColor: '#FF0000', borderWidth: 2 },
+  todayDay: { backgroundColor: '#E83E8C', borderColor: '#E83E8C' },
+  eventDay: { backgroundColor: '#FFFFFF', borderColor: '#E83E8C', borderWidth: 2 },
   dayNumber: { fontSize: 12, fontWeight: '600', color: '#000000' },
   dayNumberToday: { color: '#fff' },
   dayNumberEvent: { color: '#000000' },
   eventIndicators: { flexDirection: 'row', marginTop: 2, alignItems: 'center' },
-  eventDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#FF0000' },
-  moreIndicator: { fontSize: 8, color: '#FF0000', fontWeight: 'bold', marginLeft: 2 },
+  eventDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#E83E8C' },
+  moreIndicator: { fontSize: 8, color: '#E83E8C', fontWeight: 'bold', marginLeft: 2 },
   activityIndicator: { fontSize: 8, marginTop: 1 },
   activitiesSection: { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 12, marginBottom: 16 },
   activitiesSectionTitle: { fontSize: 13, fontWeight: '700', color: '#2a2a2a', marginBottom: 8 },
   activityRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  activityCheckbox: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#FF0000', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  activityCheckboxDone: { backgroundColor: '#FF0000' },
+  activityCheckbox: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#E83E8C', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  activityCheckboxDone: { backgroundColor: '#E83E8C' },
   activityCheckmark: { fontSize: 11, color: '#fff', fontWeight: 'bold' },
   activityText: { fontSize: 13, color: '#2a2a2a', flex: 1 },
   activityTextCompleted: { color: '#999', textDecorationLine: 'line-through' },
   monthEventsSection: { marginBottom: 30 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#000000', marginBottom: 12 },
   emptyEventsText: { fontSize: 14, color: '#666', fontStyle: 'italic', textAlign: 'center', paddingVertical: 20 },
-  eventCard: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderLeftWidth: 3, borderLeftColor: '#FF0000' },
+  eventCard: { backgroundColor: '#FCE4EC', borderRadius: 12, padding: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderLeftWidth: 3, borderLeftColor: '#E83E8C' },
   eventCardContent: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
-  eventDateBadge: { backgroundColor: '#FF0000', width: 40, height: 40, borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  eventDateBadge: { backgroundColor: '#E83E8C', width: 40, height: 40, borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   eventDateText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   eventInfo: { flex: 1 },
   eventTitle: { fontSize: 14, fontWeight: '600', color: '#000000', marginBottom: 4 },
-  eventTime: { fontSize: 12, color: '#FF0000', marginBottom: 2 },
+  eventTime: { fontSize: 12, color: '#E83E8C', marginBottom: 2 },
   eventDescription: { fontSize: 11, color: '#666', fontStyle: 'italic' },
   eventActions: { flexDirection: 'row', gap: 8 },
   eventActionBtn: { padding: 6 },
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   modalBody: { paddingHorizontal: 20, paddingTop: 15 },
   dateDisplay: { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center' },
   dateDisplayLabel: { fontSize: 13, fontWeight: '600', color: '#666', marginRight: 8 },
-  dateDisplayValue: { fontSize: 14, fontWeight: '700', color: '#FF0000' },
+  dateDisplayValue: { fontSize: 14, fontWeight: '700', color: '#E83E8C' },
   formGroup: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '600', color: '#2a2a2a', marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: '#2a2a2a' },
@@ -310,19 +310,19 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 15, paddingBottom: 20 },
   cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#2a2a2a' },
-  confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#FF0000', alignItems: 'center' },
+  confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#E83E8C', alignItems: 'center' },
   confirmBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   pickerContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20, width: '85%' },
   pickerTitle: { fontSize: 18, fontWeight: '700', color: '#2a2a2a', marginBottom: 16, textAlign: 'center' },
   monthPickerBtn: { flex: 1, backgroundColor: '#f0f0f0', paddingVertical: 12, marginHorizontal: 6, marginBottom: 8, borderRadius: 8, alignItems: 'center' },
-  monthPickerBtnActive: { backgroundColor: '#FF0000' },
+  monthPickerBtnActive: { backgroundColor: '#E83E8C' },
   monthPickerText: { fontSize: 13, fontWeight: '600', color: '#2a2a2a' },
   monthPickerTextActive: { color: '#fff' },
   yearPickerBtn: { flex: 1, backgroundColor: '#f0f0f0', paddingVertical: 12, marginHorizontal: 6, marginBottom: 8, borderRadius: 8, alignItems: 'center' },
-  yearPickerBtnActive: { backgroundColor: '#FF0000' },
+  yearPickerBtnActive: { backgroundColor: '#E83E8C' },
   yearPickerText: { fontSize: 13, fontWeight: '600', color: '#2a2a2a' },
   yearPickerTextActive: { color: '#fff' },
-  pickerCloseBtn: { backgroundColor: '#FF0000', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 16 },
+  pickerCloseBtn: { backgroundColor: '#E83E8C', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 16 },
   pickerCloseBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 });

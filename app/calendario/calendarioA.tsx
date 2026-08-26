@@ -4,7 +4,9 @@ import {
   Modal, TextInput, FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { salvar, carregar } from '../../utils/storage';
+import { useSharedActivities, getActivitiesForPerson, isActivityOnDate, isCompletedOnDate } from '@/hooks/useSharedActivities';
 
 interface Event {
   id: string;
@@ -16,6 +18,7 @@ interface Event {
 
 export default function CalendarioAmandaScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 7));
   const [events, setEvents] = useState<Event[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -26,6 +29,8 @@ export default function CalendarioAmandaScreen() {
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formTime, setFormTime] = useState('');
+  const { activities, toggleCompletion } = useSharedActivities();
+  const myActivities = getActivitiesForPerson(activities, 'amanda');
 
   // Carregar eventos ao abrir
   useEffect(() => {
@@ -66,6 +71,8 @@ export default function CalendarioAmandaScreen() {
   const handleDeleteEvent = (id: string) => { setEvents(prev => prev.filter(e => e.id !== id)); };
   const openEditModal = (event: Event) => { setSelectedDate(event.date); setEditingEventId(event.id); setFormTitle(event.title); setFormDescription(event.description); setFormTime(event.time); setModalVisible(true); };
   const getEventsForDate = (date: string) => events.filter(e => e.date === date);
+  const parseDateStr = (dateStr: string) => { const [d, m, y] = dateStr.split('/').map(Number); return new Date(y, m - 1, d); };
+  const getActivitiesForDate = (dateStr: string) => myActivities.filter(a => isActivityOnDate(a, parseDateStr(dateStr)));
   const getEventsForMonth = () => events.filter(e => { const [, month, year] = e.date.split('/'); return parseInt(month) === currentDate.getMonth() + 1 && parseInt(year) === currentDate.getFullYear(); }).sort((a, b) => parseInt(a.date.split('/')[0]) - parseInt(b.date.split('/')[0]));
 
   const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -78,7 +85,7 @@ export default function CalendarioAmandaScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
@@ -102,7 +109,9 @@ export default function CalendarioAmandaScreen() {
           {calendarDays.map((day, index) => {
             const dateStr = day === null ? '' : formatDate(day, currentDate.getMonth(), currentDate.getFullYear());
             const dayEvents = dateStr ? getEventsForDate(dateStr) : [];
+            const dayActivities = dateStr ? getActivitiesForDate(dateStr) : [];
             const hasEvents = dayEvents.length > 0;
+            const hasActivities = dayActivities.length > 0;
             const isToday = day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear();
             return (
               <TouchableOpacity key={index} style={[styles.calendarDay, day === null && styles.emptyDay, isToday && styles.todayDay, hasEvents && styles.eventDay]} onPress={() => day !== null && handleDayPress(day)} disabled={day === null} activeOpacity={0.7}>
@@ -115,6 +124,7 @@ export default function CalendarioAmandaScreen() {
                         {dayEvents.length > 2 && <Text style={styles.moreIndicator}>+</Text>}
                       </View>
                     )}
+                    {hasActivities && <Text style={styles.activityIndicator}>🏠</Text>}
                   </>
                 )}
               </TouchableOpacity>
@@ -159,6 +169,26 @@ export default function CalendarioAmandaScreen() {
                 <Text style={styles.dateDisplayLabel}>Data:</Text>
                 <Text style={styles.dateDisplayValue}>{selectedDate}</Text>
               </View>
+              {getActivitiesForDate(selectedDate).length > 0 && (
+                <View style={styles.activitiesSection}>
+                  <Text style={styles.activitiesSectionTitle}>🏠 Atividades da Casa</Text>
+                  {getActivitiesForDate(selectedDate).map(activity => {
+                    const completed = isCompletedOnDate(activity, selectedDate);
+                    return (
+                      <TouchableOpacity
+                        key={activity.id}
+                        style={styles.activityRow}
+                        onPress={() => toggleCompletion(activity, selectedDate, 'amanda', 'Amanda')}
+                      >
+                        <View style={[styles.activityCheckbox, completed && styles.activityCheckboxDone]}>
+                          {completed && <Text style={styles.activityCheckmark}>✓</Text>}
+                        </View>
+                        <Text style={[styles.activityText, completed && styles.activityTextCompleted]}>{activity.title}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Título do Evento *</Text>
                 <TextInput style={styles.input} placeholder="Ex: Reunião, Aniversário..." value={formTitle} onChangeText={setFormTitle} placeholderTextColor="#ccc" />
@@ -241,6 +271,15 @@ const styles = StyleSheet.create({
   eventIndicators: { flexDirection: 'row', marginTop: 2, alignItems: 'center' },
   eventDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#e91e8c' },
   moreIndicator: { fontSize: 8, color: '#e91e8c', fontWeight: 'bold', marginLeft: 2 },
+  activityIndicator: { fontSize: 8, marginTop: 1 },
+  activitiesSection: { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 12, marginBottom: 16 },
+  activitiesSectionTitle: { fontSize: 13, fontWeight: '700', color: '#2a2a2a', marginBottom: 8 },
+  activityRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  activityCheckbox: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#e91e8c', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  activityCheckboxDone: { backgroundColor: '#e91e8c' },
+  activityCheckmark: { fontSize: 11, color: '#fff', fontWeight: 'bold' },
+  activityText: { fontSize: 13, color: '#2a2a2a', flex: 1 },
+  activityTextCompleted: { color: '#999', textDecorationLine: 'line-through' },
   monthEventsSection: { marginBottom: 30 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#6a0572', marginBottom: 12 },
   emptyEventsText: { fontSize: 14, color: '#666', fontStyle: 'italic', textAlign: 'center', paddingVertical: 20 },

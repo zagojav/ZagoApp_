@@ -10,6 +10,9 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSharedActivities, getActivitiesForPerson, relevantDateKeyForToday, isCompletedOnDate } from '@/hooks/useSharedActivities';
+import { OverdueTasksBanner } from '@/components/OverdueTasksBanner';
 
 interface PersonalTask {
   id: string;
@@ -25,9 +28,9 @@ interface Note {
 
 export default function AmandaScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [tasks, setTasks] = useState<PersonalTask[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [noteModalVisible, setNoteModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -35,6 +38,8 @@ export default function AmandaScreen() {
   const [formTaskTitle, setFormTaskTitle] = useState('');
   const [formNoteSubject, setFormNoteSubject] = useState('');
   const [formNoteDate, setFormNoteDate] = useState('');
+  const { activities, toggleCompletion } = useSharedActivities();
+  const myActivities = getActivitiesForPerson(activities, 'amanda');
 
   const completedTasks = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length;
@@ -158,21 +163,15 @@ export default function AmandaScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={() => setMenuOpen(true)}
-        >
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <View style={styles.headerCenter}>
           <Text style={styles.headerName}>Amanda</Text>
           <Text style={styles.headerSubtitle}>👋 Olá, Amanda!</Text>
         </View>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <OverdueTasksBanner personId="amanda" />
         {/* Card Estatísticas */}
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
@@ -220,40 +219,64 @@ export default function AmandaScreen() {
             </TouchableOpacity>
           </View>
 
-          {tasks.length === 0 ? (
+          {tasks.length === 0 && myActivities.length === 0 ? (
             <Text style={styles.emptyText}>Nenhuma tarefa adicionada</Text>
           ) : (
-            tasks.map(task => (
-              <TouchableOpacity
-                key={task.id}
-                style={[styles.taskItem, task.completed && styles.taskItemCompleted]}
-                onPress={() => handleToggleTask(task.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.taskCheckbox}>
-                  {task.completed && <Text style={styles.taskCheckmark}>✓</Text>}
-                </View>
-                <Text
-                  style={[
-                    styles.taskText,
-                    task.completed && styles.taskTextCompleted,
-                  ]}
-                >
-                  {task.title}
-                </Text>
+            <>
+              {myActivities.map(activity => {
+                const dateKey = relevantDateKeyForToday(activity);
+                const completed = isCompletedOnDate(activity, dateKey);
+                return (
+                  <TouchableOpacity
+                    key={activity.id}
+                    style={[styles.taskItem, completed && styles.taskItemCompleted]}
+                    onPress={() => toggleCompletion(activity, dateKey, 'amanda', 'Amanda')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.taskCheckbox}>
+                      {completed && <Text style={styles.taskCheckmark}>✓</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.taskText, completed && styles.taskTextCompleted]}>
+                        {activity.title}
+                      </Text>
+                      <Text style={styles.orgTaskBadge}>🏠 Atividade da casa</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              {tasks.map(task => (
                 <TouchableOpacity
-                  onPress={() => openTaskEditModal(task)}
-                  style={styles.taskEditBtn}
+                  key={task.id}
+                  style={[styles.taskItem, task.completed && styles.taskItemCompleted]}
+                  onPress={() => handleToggleTask(task.id)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.taskEditIcon}>✏️</Text>
+                  <View style={styles.taskCheckbox}>
+                    {task.completed && <Text style={styles.taskCheckmark}>✓</Text>}
+                  </View>
+                  <Text
+                    style={[
+                      styles.taskText,
+                      task.completed && styles.taskTextCompleted,
+                    ]}
+                  >
+                    {task.title}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => openTaskEditModal(task)}
+                    style={styles.taskEditBtn}
+                  >
+                    <Text style={styles.taskEditIcon}>✏️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteTask(task.id)}
+                  >
+                    <Text style={styles.taskDeleteIcon}>🗑️</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleDeleteTask(task.id)}
-                >
-                  <Text style={styles.taskDeleteIcon}>🗑️</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            ))
+              ))}
+            </>
           )}
         </View>
 
@@ -447,63 +470,6 @@ export default function AmandaScreen() {
         </View>
       </Modal>
 
-      {/* Menu Lateral */}
-      {menuOpen && (
-        <TouchableOpacity
-          style={styles.overlay}
-          onPress={() => setMenuOpen(false)}
-          activeOpacity={1}
-        >
-          <View style={styles.sideMenu}>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setMenuOpen(false)}
-            >
-              <Text style={styles.closeIcon}>✕</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/home');
-              }}
-            >
-              <Text style={styles.menuText}>Página Inicial</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/listas');
-              }}
-            >
-              <Text style={styles.menuText}>Listas</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/pets');
-              }}
-            >
-              <Text style={styles.menuText}>Pets</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuOpen(false);
-                router.push('/afazeres');
-              }}
-            >
-              <Text style={styles.menuText}>Afazeres de casa</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -520,19 +486,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 15,
     backgroundColor: '#6B4423',
-  },
-  menuBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#D4A574',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menuIcon: {
-    fontSize: 24,
-    color: '#1a1a1a',
-    fontWeight: 'bold',
   },
   headerCenter: {
     flex: 1,
@@ -682,6 +635,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#F5DEB3',
+  },
+  orgTaskBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B4423',
+    marginTop: 2,
   },
   taskTextCompleted: {
     color: '#B8956E',
@@ -846,42 +805,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1a1a1a',
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  sideMenu: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '65%',
-    height: '100%',
-    backgroundColor: '#6B4423',
-    paddingTop: 20,
-  },
-  closeBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  closeIcon: {
-    fontSize: 28,
-    color: '#F5DEB3',
-    fontWeight: 'bold',
-  },
-  menuItem: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(245, 222, 179, 0.1)',
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#F5DEB3',
-    fontWeight: '500',
   },
 });

@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { salvar, carregar } from '../utils/storage';
 
 interface Note {
@@ -12,12 +12,11 @@ interface Note {
   date: string;
 }
 
-type PetKey = 'Arya' | 'Sansa' | 'Stan';
+type PetKey = 'Arya' | 'Oliver' | 'Aurora' | 'Nico' | 'Stan';
 
 export default function PetsScreen() {
-  const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [notesByPet, setNotesByPet] = useState<Record<PetKey, Note[]>>({ Arya: [], Sansa: [], Stan: [] });
+  const insets = useSafeAreaInsets();
+  const [notesByPet, setNotesByPet] = useState<Record<PetKey, Note[]>>({ Arya: [], Oliver: [], Aurora: [], Nico: [], Stan: [] });
   const [modalVisible, setModalVisible] = useState(false);
   const [currentPet, setCurrentPet] = useState<PetKey>('Arya');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -88,17 +87,15 @@ export default function PetsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)}>
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Text style={styles.headerTitle}>Pets</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <PetBlock pet="Arya" />
-        <PetBlock pet="Sansa" />
+        <PetBlock pet="Oliver" />
+        <PetBlock pet="Aurora" />
+        <PetBlock pet="Nico" />
         <PetBlock pet="Stan" />
       </ScrollView>
 
@@ -128,16 +125,6 @@ export default function PetsScreen() {
         </View>
       </Modal>
 
-      {menuOpen && (
-        <TouchableOpacity style={styles.overlay} onPress={() => setMenuOpen(false)} activeOpacity={1}>
-          <View style={styles.sideMenu}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setMenuOpen(false)}><Text style={styles.closeIcon}>✕</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); router.push('/home'); }}><Text style={styles.menuText}>Página Inicial</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); router.push('/listas'); }}><Text style={styles.menuText}>Listas</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); router.push('/afazeres'); }}><Text style={styles.menuText}>Afazeres de casa</Text></TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -145,8 +132,6 @@ export default function PetsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#a89080' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15, backgroundColor: '#a89080' },
-  menuBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#d4c5b9', justifyContent: 'center', alignItems: 'center' },
-  menuIcon: { fontSize: 24, color: '#2a2a2a', fontWeight: 'bold' },
   headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#2a2a2a', letterSpacing: 1 },
   content: { paddingHorizontal: 15, paddingVertical: 20, gap: 20 },
   petBlock: { backgroundColor: '#b69372', borderRadius: 20, padding: 14 },
@@ -174,10 +159,4 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#2a2a2a' },
   confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#c9a876', alignItems: 'center' },
   confirmBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sideMenu: { position: 'absolute', top: 0, left: 0, width: '65%', height: '100%', backgroundColor: '#6f5947', paddingTop: 20 },
-  closeBtn: { paddingHorizontal: 20, paddingVertical: 10 },
-  closeIcon: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
-  menuItem: { paddingVertical: 15, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.2)' },
-  menuText: { fontSize: 16, color: '#fff', fontWeight: '500' },
 });

@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Phase 1: one shared anonymous session for the whole family device.
+    // The 4-digit PIN in the app is a UI gate for "who's using the device
+    // right now" — it is NOT enforced here, since every write's
+    // request.auth.uid is the same anonymous session regardless of which
+    // profile is active in the UI. personalNotes privacy is therefore
+    // organizational (per-profile in the app), not cryptographic.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
