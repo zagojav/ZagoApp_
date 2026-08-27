@@ -4,7 +4,7 @@ import { useFamily, type FamilyMember } from '@/hooks/useFamily';
 import { PERSON_ORDER, PERSON_PROFILES } from '@/constants/personProfiles';
 
 export default function ProfileSelectScreen() {
-  const { members, loading } = useFamily();
+  const { members, loading, error } = useFamily();
 
   const handleSelectProfile = (member: FamilyMember) => {
     if (member.pinSet) {
@@ -18,7 +18,13 @@ export default function ProfileSelectScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Deseja entrar em qual perfil?</Text>
 
-      {loading ? (
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>Não foi possível carregar os perfis</Text>
+          <Text style={styles.errorMessage}>{error.message}</Text>
+          <Text style={styles.errorHint}>Confira sua conexão e tente recarregar a página.</Text>
+        </View>
+      ) : loading ? (
         <ActivityIndicator size="large" color="#6f5947" style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
@@ -54,4 +60,8 @@ const styles = StyleSheet.create({
   card: { alignItems: 'center', width: 100 },
   avatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, marginBottom: 10 },
   name: { fontSize: 14, fontWeight: '600', color: '#2a2a2a' },
+  errorBox: { marginTop: 40, paddingHorizontal: 10 },
+  errorTitle: { fontSize: 16, fontWeight: '700', color: '#2a2a2a', textAlign: 'center', marginBottom: 8 },
+  errorMessage: { fontSize: 13, color: '#4a4a4a', textAlign: 'center', marginBottom: 12 },
+  errorHint: { fontSize: 12, color: '#5a4a40', textAlign: 'center', fontStyle: 'italic' },
 });

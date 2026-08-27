@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { salvar, carregar } from '@/utils/storage';
+import { withTimeout } from '@/utils/withTimeout';
 import type { PersonId } from '@/types/database';
 
 const ACTIVE_PROFILE_KEY = 'activeProfileId';
@@ -16,10 +17,10 @@ export function useActiveProfile(): UseActiveProfileResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    carregar<PersonId>(ACTIVE_PROFILE_KEY).then((id) => {
-      setActiveProfileId(id);
-      setLoading(false);
-    });
+    withTimeout(carregar<PersonId>(ACTIVE_PROFILE_KEY), 10000)
+      .then((id) => setActiveProfileId(id))
+      .catch(() => setActiveProfileId(null))
+      .finally(() => setLoading(false));
   }, []);
 
   const setActiveProfile = useCallback(async (id: PersonId) => {
