@@ -1,5 +1,5 @@
-// Extração de nome + preço a partir do texto cru que a Google Cloud Vision
-// devolve pra uma foto de etiqueta de mercado.
+// Extração de nome + preço a partir do texto cru que o OCR devolve pra uma
+// foto de etiqueta de mercado (hoje o ML Kit, rodando no próprio aparelho).
 //
 // Tudo aqui é HEURÍSTICA e serve só pra pré-preencher o formulário — a tela de
 // confirmação sempre deixa o usuário corrigir. Etiqueta de mercado tem fonte

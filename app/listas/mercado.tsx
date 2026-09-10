@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShoppingList } from '@/hooks/useShoppingLists';
+import { PriceListView } from '@/components/market/PriceListView';
 
 interface Item {
   id: string;
@@ -29,6 +30,8 @@ export default function MercadoScreen() {
     new Set(['Compra do mês', 'Compra da semana', 'Compra de necessidade'])
   );
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  // 'lista' = o que falta comprar; 'precos' = quanto custa em cada mercado.
+  const [view, setView] = useState<'lista' | 'precos'>('lista');
 
   const categories: Array<'Compra do mês' | 'Compra da semana' | 'Compra de necessidade'> = [
     'Compra do mês', 'Compra da semana', 'Compra de necessidade',
@@ -88,65 +91,89 @@ export default function MercadoScreen() {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mercado</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.pricesBtn} onPress={() => router.push('/listas/precos')}>
-            <Text style={styles.pricesIcon}>🏷️</Text>
-          </TouchableOpacity>
+        {view === 'lista' ? (
           <TouchableOpacity style={styles.addBtn} onPress={openNewModal}>
             <Text style={styles.addIcon}>+</Text>
           </TouchableOpacity>
-        </View>
+        ) : (
+          <View style={styles.addBtnSpacer} />
+        )}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll} contentContainerStyle={styles.categoriesContent}>
-        {categories.map(category => (
-          <TouchableOpacity key={category} style={[styles.categoryButton, selectedCategories.has(category) && styles.categoryButtonActive]} onPress={() => toggleCategory(category)}>
-            <Text style={[styles.categoryButtonText, selectedCategories.has(category) && styles.categoryButtonTextActive]}>{category}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <View style={styles.modeContainer}>
-        <TouchableOpacity style={[styles.modeButton, isShoppingMode && styles.modeButtonActive]} onPress={() => setIsShoppingMode(!isShoppingMode)}>
-          <Text style={[styles.modeButtonText, isShoppingMode && styles.modeButtonTextActive]}>{isShoppingMode ? '✓ Estou no Mercado' : 'Estou no Mercado'}</Text>
+      <View style={styles.viewSwitch}>
+        <TouchableOpacity
+          style={[styles.viewSwitchBtn, view === 'lista' && styles.viewSwitchBtnActive]}
+          onPress={() => setView('lista')}
+        >
+          <Text style={[styles.viewSwitchText, view === 'lista' && styles.viewSwitchTextActive]}>
+            🛒  Lista
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewSwitchBtn, view === 'precos' && styles.viewSwitchBtnActive]}
+          onPress={() => setView('precos')}
+        >
+          <Text style={[styles.viewSwitchText, view === 'precos' && styles.viewSwitchTextActive]}>
+            🏷️  Preços
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {isShoppingMode && filteredItems.length > 0 && (
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>{itemsCollected.length} de {filteredItems.length} itens coletados</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${(itemsCollected.length / filteredItems.length) * 100}%` }]} />
-          </View>
-        </View>
-      )}
+      {view === 'precos' ? (
+        <PriceListView bottomInset={insets.bottom} />
+      ) : (
+        <>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll} contentContainerStyle={styles.categoriesContent}>
+            {categories.map(category => (
+              <TouchableOpacity key={category} style={[styles.categoryButton, selectedCategories.has(category) && styles.categoryButtonActive]} onPress={() => toggleCategory(category)}>
+                <Text style={[styles.categoryButtonText, selectedCategories.has(category) && styles.categoryButtonTextActive]}>{category}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-      <ScrollView style={styles.content}>
-        {filteredItems.length === 0 ? (
-          <View style={styles.emptyState}><Text style={styles.emptyText}>Nenhum item nessas categorias</Text></View>
-        ) : (
-          filteredItems.map(item => (
-            <TouchableOpacity key={item.id} style={[styles.itemCard, isShoppingMode && styles.itemCardClickable, item.collected && styles.itemCardCollected]} onPress={() => isShoppingMode && handleToggleItem(item.id)} activeOpacity={isShoppingMode ? 0.7 : 1}>
-              {isShoppingMode && (
-                <View style={styles.checkbox}>{item.collected && <Text style={styles.checkmark}>✓</Text>}</View>
-              )}
-              <View style={[styles.itemInfo, isShoppingMode && { marginLeft: 10 }]}>
-                <Text style={[styles.itemName, item.collected && styles.itemNameCollected]}>{item.name}</Text>
-                <View style={styles.itemMeta}>
-                  {item.quantity && <Text style={styles.itemQuantity}>{item.quantity}</Text>}
-                  <Text style={styles.itemCategory}>{item.category}</Text>
-                </View>
+          <View style={styles.modeContainer}>
+            <TouchableOpacity style={[styles.modeButton, isShoppingMode && styles.modeButtonActive]} onPress={() => setIsShoppingMode(!isShoppingMode)}>
+              <Text style={[styles.modeButtonText, isShoppingMode && styles.modeButtonTextActive]}>{isShoppingMode ? '✓ Estou no Mercado' : 'Estou no Mercado'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {isShoppingMode && filteredItems.length > 0 && (
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressText}>{itemsCollected.length} de {filteredItems.length} itens coletados</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${(itemsCollected.length / filteredItems.length) * 100}%` }]} />
               </View>
-              {!isShoppingMode && (
-                <>
-                  <TouchableOpacity onPress={() => openEditModal(item)} style={styles.editIcon}><Text>✏️</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDeleteItem(item.id)}><Text style={styles.deleteIcon}>🗑️</Text></TouchableOpacity>
-                </>
-              )}
+            </View>
+          )}
+
+          <ScrollView style={styles.content}>
+            {filteredItems.length === 0 ? (
+              <View style={styles.emptyState}><Text style={styles.emptyText}>Nenhum item nessas categorias</Text></View>
+            ) : (
+              filteredItems.map(item => (
+                <TouchableOpacity key={item.id} style={[styles.itemCard, isShoppingMode && styles.itemCardClickable, item.collected && styles.itemCardCollected]} onPress={() => isShoppingMode && handleToggleItem(item.id)} activeOpacity={isShoppingMode ? 0.7 : 1}>
+                  {isShoppingMode && (
+                    <View style={styles.checkbox}>{item.collected && <Text style={styles.checkmark}>✓</Text>}</View>
+                  )}
+                  <View style={[styles.itemInfo, isShoppingMode && { marginLeft: 10 }]}>
+                    <Text style={[styles.itemName, item.collected && styles.itemNameCollected]}>{item.name}</Text>
+                    <View style={styles.itemMeta}>
+                      {item.quantity && <Text style={styles.itemQuantity}>{item.quantity}</Text>}
+                      <Text style={styles.itemCategory}>{item.category}</Text>
+                    </View>
+                  </View>
+                  {!isShoppingMode && (
+                    <>
+                      <TouchableOpacity onPress={() => openEditModal(item)} style={styles.editIcon}><Text>✏️</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteItem(item.id)}><Text style={styles.deleteIcon}>🗑️</Text></TouchableOpacity>
+        </>
+      )}
             </TouchableOpacity>
           ))
         )}
       </ScrollView>
+      </>
+      )}
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -203,9 +230,12 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#d4c5b9', justifyContent: 'center', alignItems: 'center' },
   backIcon: { fontSize: 24, color: '#2a2a2a', fontWeight: 'bold' },
   headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#2a2a2a' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pricesBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e8dcc8', justifyContent: 'center', alignItems: 'center' },
-  pricesIcon: { fontSize: 18 },
+  addBtnSpacer: { width: 40 },
+  viewSwitch: { flexDirection: 'row', gap: 8, paddingHorizontal: 15, paddingBottom: 10 },
+  viewSwitchBtn: { flex: 1, paddingVertical: 11, borderRadius: 18, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.3)' },
+  viewSwitchBtnActive: { backgroundColor: '#e8dcc8' },
+  viewSwitchText: { fontSize: 13, fontWeight: '600', color: '#3a3a3a' },
+  viewSwitchTextActive: { color: '#2a2a2a' },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#c9a876', justifyContent: 'center', alignItems: 'center' },
   addIcon: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
   categoriesScroll: { backgroundColor: '#a89080', maxHeight: 50 },

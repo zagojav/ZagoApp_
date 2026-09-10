@@ -115,7 +115,9 @@ export default function ConfirmarPrecoScreen() {
       if (thenContinue) {
         router.back();
       } else {
-        router.dismissTo('/listas/precos');
+        // Volta pro Mercado, que continua na aba Preços — o item recém-salvo
+        // já aparece lá pelo onSnapshot.
+        router.dismissTo('/listas/mercado');
       }
     } catch {
       setError('Não consegui salvar. Confira a internet e tente de novo.');
