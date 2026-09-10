@@ -104,9 +104,14 @@ export default function MercadoScreen() {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mercado</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={openNewModal}>
-          <Text style={styles.addIcon}>+</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.pricesBtn} onPress={() => router.push('/listas/precos')}>
+            <Text style={styles.pricesIcon}>🏷️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={openNewModal}>
+            <Text style={styles.addIcon}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll} contentContainerStyle={styles.categoriesContent}>
@@ -214,6 +219,9 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#d4c5b9', justifyContent: 'center', alignItems: 'center' },
   backIcon: { fontSize: 24, color: '#2a2a2a', fontWeight: 'bold' },
   headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#2a2a2a' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pricesBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e8dcc8', justifyContent: 'center', alignItems: 'center' },
+  pricesIcon: { fontSize: 18 },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#c9a876', justifyContent: 'center', alignItems: 'center' },
   addIcon: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
   categoriesScroll: { backgroundColor: '#a89080', maxHeight: 50 },

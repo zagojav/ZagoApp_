@@ -171,3 +171,58 @@ export interface RankingEntry {
   betsParcial: number;
   updatedAt: Timestamp;
 }
+
+// === markets ===
+// Lojas físicas onde a família compra. Cadastradas pela própria família —
+// não há integração com nenhuma API externa de mercado.
+export interface Market {
+  id: string;
+  familyId: string;
+  name: string; // 'São Vicente'
+  location: string; // 'Barueri' — livre, só pra distinguir filiais
+  createdAt: Timestamp;
+}
+
+// === priceItems ===
+export type PriceCategory =
+  | 'Grãos'
+  | 'Frios'
+  | 'Bebidas'
+  | 'Limpeza'
+  | 'Hortifruti'
+  | 'Higiene'
+  | 'Carnes'
+  | 'Padaria'
+  | 'Outros';
+
+export const PRICE_CATEGORIES: PriceCategory[] = [
+  'Grãos', 'Frios', 'Bebidas', 'Limpeza', 'Hortifruti',
+  'Higiene', 'Carnes', 'Padaria', 'Outros',
+];
+
+// Um preço observado de um produto em um mercado. Vive dentro do array
+// `prices` do PriceItem — um registro por mercado, sobrescrito quando o
+// mesmo produto é escaneado de novo na mesma loja.
+export interface MarketPrice {
+  marketId: string;
+  marketName: string; // desnormalizado: a lista agrupada não precisa ler `markets`
+  price: number;
+  updatedAt: Timestamp;
+  updatedBy: PersonId;
+  updatedByName: string;
+}
+
+export interface PriceItem {
+  id: string;
+  familyId: string;
+  productName: string;
+  // Forma canônica do productName (minúsculo, sem acento, sem pontuação),
+  // gravada junto pra permitir o match "esse produto já existe?" sem
+  // baixar e normalizar a coleção inteira a cada save.
+  normalizedName: string;
+  category: PriceCategory;
+  prices: MarketPrice[];
+  createdBy: PersonId;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}

@@ -1,0 +1,1 @@
+export { scanPriceLabel } from './ocrPrice';
