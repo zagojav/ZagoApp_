@@ -1,57 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { salvar, carregar } from '../utils/storage';
-
-interface Note {
-  id: string;
-  subject: string;
-  date: string;
-}
+import { Timestamp } from 'firebase/firestore';
+import { usePets } from '@/hooks/usePets';
+import { useActiveProfile } from '@/hooks/useActiveProfile';
+import { PERSON_PROFILES } from '@/constants/personProfiles';
+import type { PetNote } from '@/types/database';
 
 type PetKey = 'Arya' | 'Oliver' | 'Aurora' | 'Nico' | 'Stan';
 
 export default function PetsScreen() {
   const insets = useSafeAreaInsets();
-  const [notesByPet, setNotesByPet] = useState<Record<PetKey, Note[]>>({ Arya: [], Oliver: [], Aurora: [], Nico: [], Stan: [] });
+  const { pets, saveNotes } = usePets();
+  const { activeProfileId } = useActiveProfile();
   const [modalVisible, setModalVisible] = useState(false);
   const [currentPet, setCurrentPet] = useState<PetKey>('Arya');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [formSubject, setFormSubject] = useState('');
   const [formDate, setFormDate] = useState('');
 
-  // Carregar notas ao abrir
-  useEffect(() => {
-    carregar<Record<PetKey, Note[]>>('pets_notas').then(dados => {
-      if (dados) setNotesByPet(dados);
-    });
-  }, []);
-
-  // Salvar sempre que mudar
-  useEffect(() => {
-    salvar('pets_notas', notesByPet);
-  }, [notesByPet]);
+  const getNotes = (pet: PetKey): PetNote[] => pets.find(p => p.name === pet)?.notes ?? [];
 
   const openNewNote = (pet: PetKey) => {
     setCurrentPet(pet); setEditingNoteId(null); setFormSubject(''); setFormDate(''); setModalVisible(true);
   };
 
-  const openEditNote = (pet: PetKey, note: Note) => {
+  const openEditNote = (pet: PetKey, note: PetNote) => {
     setCurrentPet(pet); setEditingNoteId(note.id); setFormSubject(note.subject); setFormDate(note.date); setModalVisible(true);
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!formSubject.trim() && !formDate.trim()) { setModalVisible(false); return; }
-    setNotesByPet(prev => {
-      const petNotes = prev[currentPet] || [];
-      if (editingNoteId) {
-        return { ...prev, [currentPet]: petNotes.map(n => n.id === editingNoteId ? { ...n, subject: formSubject, date: formDate } : n) };
-      }
-      return { ...prev, [currentPet]: [...petNotes, { id: Date.now().toString(), subject: formSubject, date: formDate }] };
-    });
+    const petNotes = getNotes(currentPet);
+    const nextNotes = editingNoteId
+      ? petNotes.map(n => n.id === editingNoteId ? { ...n, subject: formSubject, date: formDate } : n)
+      : [
+          ...petNotes,
+          {
+            id: Date.now().toString(),
+            subject: formSubject,
+            date: formDate,
+            createdBy: activeProfileId ?? 'guilherme',
+            createdByName: activeProfileId ? PERSON_PROFILES[activeProfileId].name : '',
+            createdAt: Timestamp.now(),
+          },
+        ];
+    await saveNotes(currentPet.toLowerCase(), nextNotes);
     setModalVisible(false);
     setEditingNoteId(null);
     setFormSubject('');
@@ -59,7 +56,7 @@ export default function PetsScreen() {
   };
 
   const handleDeleteNote = (pet: PetKey, id: string) => {
-    setNotesByPet(prev => ({ ...prev, [pet]: prev[pet].filter(n => n.id !== id) }));
+    saveNotes(pet.toLowerCase(), getNotes(pet).filter(n => n.id !== id));
   };
 
   const PetBlock = ({ pet }: { pet: PetKey }) => (
@@ -70,7 +67,7 @@ export default function PetsScreen() {
         <Text style={[styles.tableHeaderText, { flex: 1 }]}>Data</Text>
         <Text style={[styles.tableHeaderText, { width: 40 }]} />
       </View>
-      {notesByPet[pet].map(note => (
+      {getNotes(pet).map(note => (
         <TouchableOpacity key={note.id} style={styles.tableRow} onPress={() => openEditNote(pet, note)} activeOpacity={0.7}>
           <Text style={[styles.cellText, { flex: 2 }]}>{note.subject}</Text>
           <Text style={[styles.cellText, { flex: 1 }]}>{note.date}</Text>

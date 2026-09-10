@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, Modal, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { salvar, carregar } from '../../utils/storage';
+import { useShoppingList } from '@/hooks/useShoppingLists';
 
 interface Item {
   id: string;
@@ -18,7 +18,7 @@ interface Item {
 export default function MercadoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState<Item[]>([]);
+  const { items, saveItems } = useShoppingList<Item>('mercado');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
@@ -34,30 +34,16 @@ export default function MercadoScreen() {
     'Compra do mês', 'Compra da semana', 'Compra de necessidade',
   ];
 
-  // Carregar itens ao abrir
-  useEffect(() => {
-    carregar<Item[]>('itens_mercado').then(dados => {
-      if (dados) setItems(dados);
-    });
-  }, []);
-
-  // Salvar sempre que mudar
-  useEffect(() => {
-    salvar('itens_mercado', items);
-  }, [items]);
-
   const filteredItems = items.filter(item => selectedCategories.has(item.category));
   const itemsToShop = filteredItems.filter(item => !item.collected);
   const itemsCollected = filteredItems.filter(item => item.collected);
 
   const handleAddItem = () => {
     if (!formName.trim()) { setModalVisible(false); return; }
-    setItems(prev => {
-      if (editingItemId) {
-        return prev.map(item => item.id === editingItemId ? { ...item, name: formName, quantity: formQuantity, category: formCategory } : item);
-      }
-      return [...prev, { id: Date.now().toString(), name: formName, quantity: formQuantity, category: formCategory, collected: false }];
-    });
+    const nextItems = editingItemId
+      ? items.map(item => item.id === editingItemId ? { ...item, name: formName, quantity: formQuantity, category: formCategory } : item)
+      : [...items, { id: Date.now().toString(), name: formName, quantity: formQuantity, category: formCategory, collected: false }];
+    saveItems(nextItems);
     setModalVisible(false);
     setEditingItemId(null);
     setFormName('');
@@ -65,16 +51,14 @@ export default function MercadoScreen() {
     setFormCategory('Compra da semana');
   };
 
-  const handleDeleteItem = (id: string) => { setItems(prev => prev.filter(item => item.id !== id)); };
+  const handleDeleteItem = (id: string) => { saveItems(items.filter(item => item.id !== id)); };
 
   const handleToggleItem = (id: string) => {
-    setItems(prev => {
-      const updated = prev.map(item => item.id === id ? { ...item, collected: !item.collected } : item);
-      const filteredUpdated = updated.filter(item => selectedCategories.has(item.category));
-      const allCollected = filteredUpdated.length > 0 && filteredUpdated.every(item => item.collected);
-      if (allCollected) setTimeout(() => setCompletionModalVisible(true), 300);
-      return updated;
-    });
+    const updated = items.map(item => item.id === id ? { ...item, collected: !item.collected } : item);
+    const filteredUpdated = updated.filter(item => selectedCategories.has(item.category));
+    const allCollected = filteredUpdated.length > 0 && filteredUpdated.every(item => item.collected);
+    if (allCollected) setTimeout(() => setCompletionModalVisible(true), 300);
+    saveItems(updated);
   };
 
   const openEditModal = (item: Item) => {
@@ -92,7 +76,7 @@ export default function MercadoScreen() {
   };
 
   const resetCollected = () => {
-    setItems(prev => prev.map(item => (selectedCategories.has(item.category) ? { ...item, collected: false } : item)));
+    saveItems(items.map(item => (selectedCategories.has(item.category) ? { ...item, collected: false } : item)));
     setCompletionModalVisible(false);
     setIsShoppingMode(false);
   };

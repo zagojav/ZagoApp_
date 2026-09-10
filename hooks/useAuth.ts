@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { auth } from '@/services/firebase';
+import { withTimeout } from '@/utils/withTimeout';
 
 interface UseAuthResult {
   user: User | null;
@@ -19,7 +20,7 @@ export function useAuth(): UseAuthResult {
         setUser(firebaseUser);
         setLoading(false);
       } else {
-        signInAnonymously(auth).catch((err) => {
+        withTimeout(signInAnonymously(auth), 10000, 'Não foi possível entrar. Tente recarregar a página.').catch((err) => {
           setError(err instanceof Error ? err : new Error(String(err)));
           setLoading(false);
         });

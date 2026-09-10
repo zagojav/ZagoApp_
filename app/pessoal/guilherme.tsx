@@ -12,7 +12,9 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedActivities, getActivitiesForPerson, relevantDateKeyForToday, isCompletedOnDate } from '@/hooks/useSharedActivities';
+import { useReminders } from '@/hooks/useReminders';
 import { OverdueTasksBanner } from '@/components/OverdueTasksBanner';
+import type { Reminder } from '@/types/database';
 
 
 interface PersonalTask {
@@ -22,18 +24,10 @@ interface PersonalTask {
 }
 
 
-interface Note {
-  id: string;
-  subject: string;
-  date: string;
-}
-
-
 export default function GuilhermeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tasks, setTasks] = useState<PersonalTask[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [noteModalVisible, setNoteModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -43,6 +37,7 @@ export default function GuilhermeScreen() {
   const [formNoteDate, setFormNoteDate] = useState('');
   const { activities, toggleCompletion } = useSharedActivities();
   const myActivities = getActivitiesForPerson(activities, 'guilherme');
+  const { reminders, addReminder, updateReminder, completeReminder, deleteReminder } = useReminders('guilherme');
 
 
   const completedTasks = tasks.filter(t => t.completed).length;
@@ -108,31 +103,17 @@ export default function GuilhermeScreen() {
 
 
   // === NOTAS PESSOAIS ===
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!formNoteSubject.trim() && !formNoteDate.trim()) {
       setNoteModalVisible(false);
       return;
     }
 
-
-    setNotes(prev => {
-      if (editingNoteId) {
-        return prev.map(n =>
-          n.id === editingNoteId
-            ? { ...n, subject: formNoteSubject, date: formNoteDate }
-            : n
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          subject: formNoteSubject,
-          date: formNoteDate,
-        },
-      ];
-    });
-
+    if (editingNoteId) {
+      await updateReminder(editingNoteId, formNoteSubject, formNoteDate);
+    } else {
+      await addReminder(formNoteSubject, formNoteDate);
+    }
 
     setNoteModalVisible(false);
     setEditingNoteId(null);
@@ -142,14 +123,14 @@ export default function GuilhermeScreen() {
 
 
   const handleDeleteNote = (id: string) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
+    deleteReminder(id);
   };
 
 
-  const openNoteEditModal = (note: Note) => {
-    setEditingNoteId(note.id);
-    setFormNoteSubject(note.subject);
-    setFormNoteDate(note.date);
+  const openNoteEditModal = (reminder: Reminder) => {
+    setEditingNoteId(reminder.id);
+    setFormNoteSubject(reminder.subject);
+    setFormNoteDate(reminder.date);
     setNoteModalVisible(true);
   };
 
@@ -318,30 +299,37 @@ export default function GuilhermeScreen() {
           </View>
 
 
-          {notes.length === 0 ? (
+          {reminders.length === 0 ? (
             <Text style={styles.emptyText}>Nenhum lembrete adicionado</Text>
           ) : (
             <View style={styles.notesTable}>
               <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, { width: 30 }]} />
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>Assunto</Text>
                 <Text style={[styles.tableHeaderText, { flex: 1 }]}>Data</Text>
                 <Text style={[styles.tableHeaderText, { width: 60 }]} />
               </View>
-              {notes.map(note => (
+              {reminders.map(reminder => (
                 <TouchableOpacity
-                  key={note.id}
+                  key={reminder.id}
                   style={styles.tableRow}
-                  onPress={() => openNoteEditModal(note)}
+                  onPress={() => openNoteEditModal(reminder)}
                   activeOpacity={0.7}
                 >
+                  <TouchableOpacity
+                    onPress={() => completeReminder(reminder.id)}
+                    style={styles.reminderCheckbox}
+                  >
+                    <Text style={styles.reminderCheckIcon}>✓</Text>
+                  </TouchableOpacity>
                   <Text style={[styles.cellText, { flex: 2 }]}>
-                    {note.subject}
+                    {reminder.subject}
                   </Text>
                   <Text style={[styles.cellText, { flex: 1 }]}>
-                    {note.date}
+                    {reminder.date}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleDeleteNote(note.id)}
+                    onPress={() => handleDeleteNote(reminder.id)}
                     style={styles.deleteNoteBtn}
                   >
                     <Text style={styles.deleteNoteIcon}>🗑️</Text>
@@ -727,6 +715,20 @@ const styles = StyleSheet.create({
   },
   deleteNoteIcon: {
     fontSize: 14,
+  },
+  reminderCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#FF0000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reminderCheckIcon: {
+    fontSize: 10,
+    color: '#FF0000',
+    fontWeight: 'bold',
   },
   quickLinksSection: {
     marginBottom: 30,

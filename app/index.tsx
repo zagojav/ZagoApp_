@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveProfile } from '@/hooks/useActiveProfile';
 import { ensureFamilySeeded, ensurePetsSeeded } from '@/services/seed';
+import { withTimeout } from '@/utils/withTimeout';
 
 export default function Index() {
   const { user, loading: authLoading, error: authError } = useAuth();
@@ -13,7 +14,11 @@ export default function Index() {
 
   useEffect(() => {
     if (user && !seeded && !seedError) {
-      Promise.all([ensureFamilySeeded(), ensurePetsSeeded()])
+      withTimeout(
+        Promise.all([ensureFamilySeeded(), ensurePetsSeeded()]),
+        10000,
+        'Não foi possível carregar os dados da família. Tente recarregar a página.'
+      )
         .then(() => setSeeded(true))
         .catch((err) => setSeedError(err instanceof Error ? err : new Error(String(err))));
     }

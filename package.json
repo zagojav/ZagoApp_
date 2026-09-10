@@ -12,8 +12,10 @@
     "lint": "expo lint",
     "build": "expo export --platform web",
     "predeploy": "npm run build",
-    "build:web": "expo export --platform web",
-    "deploy": "gh-pages -d web-build"
+    "build:web": "npx expo export --platform web",
+    "serve:web": "cd dist && npx serve",
+    "test:web": "npx http-server dist/",
+    "deploy": "vercel"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
