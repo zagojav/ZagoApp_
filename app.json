@@ -27,7 +27,13 @@
     "web": {
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro",
-      "output": "static"
+      "output": "static",
+      "name": "ZagoApp",
+      "shortName": "ZagoApp",
+      "themeColor": "#6f5947",
+      "backgroundColor": "#2E2722",
+      "display": "standalone",
+      "lang": "pt-BR"
     },
     "plugins": [
       "expo-router",
@@ -37,9 +43,9 @@
           "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#2E2722",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#2E2722"
           }
         }
       ],

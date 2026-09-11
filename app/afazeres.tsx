@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, Modal,
+  TextInput, Modal, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useActiveProfile } from '@/hooks/useActiveProfile';
@@ -18,6 +18,8 @@ import { showAlert, showConfirm } from '@/utils/alert';
 import { salvar, carregar } from '@/utils/storage';
 import { notifyMissedTask } from '@/services/notifications';
 import { PERSON_ORDER, PERSON_PROFILES } from '@/constants/personProfiles';
+import { casa } from '@/constants/casaStyles';
+import { Casa, HEADER_MENU_SLOT, Radius, Sheet, Spacing, shadow } from '@/constants/design';
 import type { ActivityFrequency, PersonId, SharedActivity } from '@/types/database';
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -180,45 +182,58 @@ export default function AfazeresScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
-        <Text style={styles.headerTitle}>Afazeres</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setModalVisible(true)}>
-          <Text style={styles.addIcon}>+</Text>
+    <View style={casa.container}>
+      <View style={[casa.header, styles.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={casa.headerTitleFlex}>Afazeres</Text>
+        <TouchableOpacity style={casa.addBtn} onPress={() => setModalVisible(true)} activeOpacity={0.85}>
+          <Text style={casa.addIcon}>+</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <TextInput style={styles.searchInput} placeholder="Pesquisar tarefa..." placeholderTextColor="#999" value={searchText} onChangeText={setSearchText} />
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Pesquisar tarefa..."
+          placeholderTextColor={Sheet.placeholder}
+          value={searchText}
+          onChangeText={setSearchText}
+        />
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll} contentContainerStyle={styles.filtersContent}>
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Status:</Text>
+        <View style={casa.chipRow}>
+          <Text style={casa.filterLabel}>Status</Text>
           {(['Todas', 'Pendente', 'Concluído'] as const).map((status) => (
-            <TouchableOpacity key={status} style={[styles.filterBtn, filterStatus === status && styles.filterBtnActive]} onPress={() => setFilterStatus(status)}>
-              <Text style={[styles.filterBtnText, filterStatus === status && styles.filterBtnTextActive]}>{status}</Text>
+            <TouchableOpacity key={status} style={[casa.chip, filterStatus === status && casa.chipActive]} onPress={() => setFilterStatus(status)} activeOpacity={0.75}>
+              <Text style={[casa.chipText, filterStatus === status && casa.chipTextActive]}>{status}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Responsável:</Text>
-          <TouchableOpacity style={[styles.filterBtn, filterResponsible === 'Todos' && styles.filterBtnActive]} onPress={() => setFilterResponsible('Todos')}>
-            <Text style={[styles.filterBtnText, filterResponsible === 'Todos' && styles.filterBtnTextActive]}>Todos</Text>
+        <View style={styles.filterSeparator} />
+        <View style={casa.chipRow}>
+          <Text style={casa.filterLabel}>Responsável</Text>
+          <TouchableOpacity style={[casa.chip, filterResponsible === 'Todos' && casa.chipActive]} onPress={() => setFilterResponsible('Todos')} activeOpacity={0.75}>
+            <Text style={[casa.chipText, filterResponsible === 'Todos' && casa.chipTextActive]}>Todos</Text>
           </TouchableOpacity>
           {PERSON_ORDER.map((id) => (
-            <TouchableOpacity key={id} style={[styles.filterBtn, filterResponsible === id && styles.filterBtnActive]} onPress={() => setFilterResponsible(id)}>
-              <Text style={[styles.filterBtnText, filterResponsible === id && styles.filterBtnTextActive]}>{PERSON_PROFILES[id].name}</Text>
+            <TouchableOpacity key={id} style={[casa.chip, filterResponsible === id && casa.chipActive]} onPress={() => setFilterResponsible(id)} activeOpacity={0.75}>
+              <Text style={[casa.chipText, filterResponsible === id && casa.chipTextActive]}>{PERSON_PROFILES[id].name}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-      <ScrollView style={styles.tasksList}>
-        {!loading && filteredActivities.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Nenhuma tarefa encontrada</Text>
-            {activities.length > 0 && <Text style={styles.emptySubtext}>Tente ajustar os filtros</Text>}
+      <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListInner} showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <View style={casa.emptyState}>
+            <ActivityIndicator size="large" color={Casa.accent} />
+          </View>
+        ) : filteredActivities.length === 0 ? (
+          <View style={casa.emptyState}>
+            <Text style={styles.emptyIcon}>🗒️</Text>
+            <Text style={casa.emptyText}>Nenhuma tarefa encontrada</Text>
+            {activities.length > 0 && <Text style={casa.emptySubtext}>Tente ajustar os filtros</Text>}
           </View>
         ) : (
           filteredActivities.map((activity) => {
@@ -227,9 +242,17 @@ export default function AfazeresScreen() {
             const canTrack = activeProfileId === activity.createdBy && activity.createdBy !== activity.assignedTo;
             return (
               <View key={activity.id} style={[styles.taskCard, completedToday && styles.taskCardCompleted]}>
-                <TouchableOpacity style={styles.taskContent} onPress={() => handleToggle(activity)}>
-                  <View style={[styles.taskCheckbox, responsible && { borderColor: responsible.colors.primary }]}>
-                    {completedToday && <Text style={styles.checkmark}>✓</Text>}
+                <TouchableOpacity style={styles.taskContent} onPress={() => handleToggle(activity)} activeOpacity={0.7}>
+                  <View
+                    style={[
+                      styles.taskCheckbox,
+                      responsible && { borderColor: responsible.colors.primary },
+                      completedToday && responsible && { backgroundColor: responsible.colors.primary },
+                    ]}
+                  >
+                    {completedToday && (
+                      <Text style={[styles.checkmark, responsible ? { color: responsible.colors.secondary } : null]}>✓</Text>
+                    )}
                   </View>
                   <View style={styles.taskInfo}>
                     <Text style={[styles.taskTitle, completedToday && styles.taskTitleCompleted]}>{activity.title}</Text>
@@ -245,12 +268,12 @@ export default function AfazeresScreen() {
                 </TouchableOpacity>
                 <View style={styles.taskActions}>
                   {canTrack && (
-                    <TouchableOpacity style={styles.trackBtn} onPress={() => setTrackingActivity(activity)}>
-                      <Text style={styles.trackIcon}>📊</Text>
+                    <TouchableOpacity style={styles.taskActionBtn} onPress={() => setTrackingActivity(activity)} activeOpacity={0.6}>
+                      <Text style={styles.taskActionIcon}>📊</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(activity.id)}>
-                    <Text style={styles.deleteIcon}>🗑️</Text>
+                  <TouchableOpacity style={styles.taskActionBtn} onPress={() => handleDelete(activity.id)} activeOpacity={0.6}>
+                    <Text style={styles.taskActionIcon}>🗑️</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -260,28 +283,34 @@ export default function AfazeresScreen() {
       </ScrollView>
 
       <Modal visible={trackingActivity !== null} transparent animationType="slide" onRequestClose={() => setTrackingActivity(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Acompanhamento</Text>
-              <TouchableOpacity onPress={() => setTrackingActivity(null)}><Text style={styles.closeModal}>✕</Text></TouchableOpacity>
+        <View style={casa.modalOverlay}>
+          <View style={casa.modalContent}>
+            <View style={casa.modalGrabber} />
+            <View style={casa.modalHeader}>
+              <Text style={casa.modalTitle}>Acompanhamento</Text>
+              <TouchableOpacity style={casa.closeModal} onPress={() => setTrackingActivity(null)} activeOpacity={0.6}>
+                <Text style={casa.closeModalIcon}>✕</Text>
+              </TouchableOpacity>
             </View>
             {trackingActivity && (
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <ScrollView style={casa.modalBody} showsVerticalScrollIndicator={false}>
                 <Text style={styles.trackingTitle}>{trackingActivity.title}</Text>
                 <Text style={styles.trackingSubtitle}>
                   Responsável: {trackingActivity.assignedTo ? PERSON_PROFILES[trackingActivity.assignedTo].name : '—'}
                 </Text>
-                {getOccurrenceHistory(trackingActivity)
-                  .slice()
-                  .reverse()
-                  .map((occurrence) => (
-                    <View key={occurrence.dateKey} style={styles.occurrenceRow}>
-                      <Text style={styles.occurrenceIcon}>{occurrenceStatusIcon(occurrence.status)}</Text>
-                      <Text style={styles.occurrenceLabel}>{occurrenceLabel(occurrence)}</Text>
-                      <Text style={styles.occurrenceStatus}>{occurrenceStatusDetail(occurrence)}</Text>
-                    </View>
-                  ))}
+                <View style={styles.occurrenceList}>
+                  {getOccurrenceHistory(trackingActivity)
+                    .slice()
+                    .reverse()
+                    .map((occurrence) => (
+                      <View key={occurrence.dateKey} style={styles.occurrenceRow}>
+                        <Text style={styles.occurrenceIcon}>{occurrenceStatusIcon(occurrence.status)}</Text>
+                        <Text style={styles.occurrenceLabel}>{occurrenceLabel(occurrence)}</Text>
+                        <Text style={styles.occurrenceStatus}>{occurrenceStatusDetail(occurrence)}</Text>
+                      </View>
+                    ))}
+                </View>
+                <View style={styles.modalBottomSpacer} />
               </ScrollView>
             )}
           </View>
@@ -289,38 +318,45 @@ export default function AfazeresScreen() {
       </Modal>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nova Tarefa</Text>
-              <TouchableOpacity onPress={() => { setModalVisible(false); resetForm(); }}><Text style={styles.closeModal}>✕</Text></TouchableOpacity>
+        <View style={casa.modalOverlay}>
+          <View style={casa.modalContent}>
+            <View style={casa.modalGrabber} />
+            <View style={casa.modalHeader}>
+              <Text style={casa.modalTitle}>Nova tarefa</Text>
+              <TouchableOpacity style={casa.closeModal} onPress={() => { setModalVisible(false); resetForm(); }} activeOpacity={0.6}>
+                <Text style={casa.closeModalIcon}>✕</Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Título *</Text>
-                <TextInput style={styles.formInput} placeholder="O que precisa ser feito?" value={formTitle} onChangeText={setFormTitle} placeholderTextColor="#ccc" />
+            <ScrollView style={casa.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={casa.formGroup}>
+                <Text style={casa.formLabel}>Título *</Text>
+                <TextInput style={casa.formInput} placeholder="O que precisa ser feito?" value={formTitle} onChangeText={setFormTitle} placeholderTextColor={Sheet.placeholder} />
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Responsável</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.peopleScroll}>
+              <View style={casa.formGroup}>
+                <Text style={casa.formLabel}>Responsável</Text>
+                <View style={styles.optionRow}>
                   {PERSON_ORDER.map((id) => (
                     <TouchableOpacity
                       key={id}
-                      style={[styles.peopleOption, formAssignedTo === id && { backgroundColor: PERSON_PROFILES[id].colors.primary }]}
+                      style={[
+                        casa.sheetChip,
+                        formAssignedTo === id && { backgroundColor: PERSON_PROFILES[id].colors.primary, borderColor: PERSON_PROFILES[id].colors.primary },
+                      ]}
                       onPress={() => setFormAssignedTo(id)}
+                      activeOpacity={0.75}
                     >
-                      <Text style={[styles.peopleOptionText, formAssignedTo === id && { color: PERSON_PROFILES[id].colors.secondary }]}>
+                      <Text style={[casa.sheetChipText, formAssignedTo === id && { color: PERSON_PROFILES[id].colors.secondary }]}>
                         {PERSON_PROFILES[id].name}
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+                </View>
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Frequência</Text>
-                <View style={styles.frequencyRow}>
+              <View style={casa.formGroup}>
+                <Text style={casa.formLabel}>Frequência</Text>
+                <View style={styles.optionRow}>
                   {([
                     ['once', 'Uma vez'],
                     ['daily', 'Diariamente'],
@@ -328,42 +364,48 @@ export default function AfazeresScreen() {
                   ] as const).map(([value, label]) => (
                     <TouchableOpacity
                       key={value}
-                      style={[styles.categoryOption, formFrequency === value && styles.categoryOptionActive]}
+                      style={[casa.sheetChip, formFrequency === value && casa.sheetChipActive]}
                       onPress={() => setFormFrequency(value)}
+                      activeOpacity={0.75}
                     >
-                      <Text style={[styles.categoryOptionText, formFrequency === value && styles.categoryOptionTextActive]}>{label}</Text>
+                      <Text style={[casa.sheetChipText, formFrequency === value && casa.sheetChipTextActive]}>{label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
 
               {formFrequency === 'once' && (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Data</Text>
-                  <TextInput style={styles.formInput} placeholder="DD/MM/AAAA" value={formDate} onChangeText={setFormDate} placeholderTextColor="#ccc" />
+                <View style={casa.formGroup}>
+                  <Text style={casa.formLabel}>Data</Text>
+                  <TextInput style={casa.formInput} placeholder="DD/MM/AAAA" value={formDate} onChangeText={setFormDate} placeholderTextColor={Sheet.placeholder} />
                 </View>
               )}
 
               {formFrequency === 'weekly' && (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Dias da semana</Text>
-                  <View style={styles.frequencyRow}>
+                <View style={casa.formGroup}>
+                  <Text style={casa.formLabel}>Dias da semana</Text>
+                  <View style={styles.weekdayRow}>
                     {WEEKDAY_LABELS.map((label, index) => (
                       <TouchableOpacity
                         key={label}
-                        style={[styles.categoryOption, formDaysOfWeek.includes(index) && styles.categoryOptionActive]}
+                        style={[styles.weekdayBtn, formDaysOfWeek.includes(index) && casa.sheetChipActive]}
                         onPress={() => toggleFormDay(index)}
+                        activeOpacity={0.75}
                       >
-                        <Text style={[styles.categoryOptionText, formDaysOfWeek.includes(index) && styles.categoryOptionTextActive]}>{label}</Text>
+                        <Text style={[casa.sheetChipText, styles.weekdayText, formDaysOfWeek.includes(index) && casa.sheetChipTextActive]}>{label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
               )}
             </ScrollView>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }}><Text style={styles.cancelBtnText}>Cancelar</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleAddActivity}><Text style={styles.confirmBtnText}>Adicionar</Text></TouchableOpacity>
+            <View style={casa.modalActions}>
+              <TouchableOpacity style={casa.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }} activeOpacity={0.7}>
+                <Text style={casa.cancelBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={casa.confirmBtn} onPress={handleAddActivity} activeOpacity={0.85}>
+                <Text style={casa.confirmBtnText}>Adicionar</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -373,68 +415,89 @@ export default function AfazeresScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#a89080' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15, backgroundColor: '#a89080' },
-  headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#2a2a2a', letterSpacing: 1 },
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#c9a876', justifyContent: 'center', alignItems: 'center', marginRight: 44 },
-  addIcon: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
-  searchContainer: { paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#a89080' },
-  searchInput: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, fontSize: 14, color: '#2a2a2a' },
-  filtersScroll: { maxHeight: 90, backgroundColor: '#a89080' },
-  filtersContent: { paddingHorizontal: 15, paddingVertical: 8, gap: 20 },
-  filterGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  filterLabel: { fontSize: 12, fontWeight: '600', color: '#2a2a2a' },
-  filterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.3)' },
-  filterBtnActive: { backgroundColor: '#c9a876' },
-  filterBtnText: { fontSize: 12, color: '#2a2a2a', fontWeight: '500' },
-  filterBtnTextActive: { color: '#fff' },
-  tasksList: { flex: 1, paddingHorizontal: 15, paddingTop: 15 },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 50 },
-  emptyText: { fontSize: 16, color: '#666', fontStyle: 'italic' },
-  emptySubtext: { fontSize: 12, color: '#999', marginTop: 5 },
-  taskCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 3 },
-  taskCardCompleted: { backgroundColor: '#f0f0f0' },
-  taskContent: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  taskCheckbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#c9a876', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
-  checkmark: { fontSize: 16, color: '#c9a876', fontWeight: 'bold' },
+  /** Reserva a faixa do botão de menu flutuante, em vez da margem
+   *  improvisada que o botão "+" carregava antes. */
+  header: { paddingRight: HEADER_MENU_SLOT },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.md + 2,
+    backgroundColor: Casa.surface,
+    borderRadius: Radius.pill,
+    ...shadow(1),
+  },
+  searchIcon: { fontSize: 13, lineHeight: 16, marginRight: Spacing.sm, opacity: 0.55 },
+  searchInput: { flex: 1, paddingVertical: Spacing.md - 1, fontSize: 14, color: Casa.ink },
+  filtersScroll: { flexGrow: 0, marginTop: Spacing.md },
+  filtersContent: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, alignItems: 'center' },
+  filterSeparator: { width: 1, height: 20, backgroundColor: Casa.lineOnPage, marginHorizontal: Spacing.lg },
+  tasksList: { flex: 1 },
+  tasksListInner: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing.xxxl },
+  emptyIcon: { fontSize: 32, lineHeight: 38, marginBottom: Spacing.md, opacity: 0.6 },
+  taskCard: {
+    backgroundColor: Casa.surface,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md + 2,
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.sm,
+    marginBottom: Spacing.sm + 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...shadow(1),
+  },
+  taskCardCompleted: { backgroundColor: Casa.surfaceSunken },
+  taskContent: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
+  taskCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Casa.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  checkmark: { fontSize: 12, lineHeight: 14, color: Casa.accent, fontWeight: '700' },
   taskInfo: { flex: 1 },
-  taskTitle: { fontSize: 15, fontWeight: '600', color: '#2a2a2a', marginBottom: 6 },
-  taskTitleCompleted: { color: '#999', textDecorationLine: 'line-through' },
-  taskMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  responsibleBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  responsibleBadgeText: { fontSize: 11, fontWeight: '600' },
-  dateText: { fontSize: 11, color: '#999' },
+  taskTitle: { fontSize: 15, fontWeight: '600', color: Casa.ink, marginBottom: Spacing.sm - 2, lineHeight: 20 },
+  taskTitleCompleted: { color: Casa.inkFaint, textDecorationLine: 'line-through' },
+  taskMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
+  responsibleBadge: { paddingHorizontal: Spacing.sm + 2, paddingVertical: 3, borderRadius: Radius.pill },
+  responsibleBadgeText: { fontSize: 11, fontWeight: '700' },
+  dateText: { fontSize: 11, color: Casa.inkFaint, fontWeight: '500' },
   taskActions: { flexDirection: 'row', alignItems: 'center' },
-  trackBtn: { padding: 8 },
-  trackIcon: { fontSize: 16 },
-  deleteBtn: { padding: 8 },
-  deleteIcon: { fontSize: 18 },
-  trackingTitle: { fontSize: 17, fontWeight: '700', color: '#2a2a2a', marginBottom: 4 },
-  trackingSubtitle: { fontSize: 13, color: '#666', marginBottom: 16 },
-  occurrenceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  occurrenceIcon: { fontSize: 16, marginRight: 10 },
-  occurrenceLabel: { fontSize: 13, fontWeight: '600', color: '#2a2a2a', width: 80 },
-  occurrenceStatus: { fontSize: 12, color: '#666', flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', paddingBottom: 10 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  modalTitle: { fontSize: 20, fontWeight: '600', color: '#2a2a2a' },
-  closeModal: { fontSize: 24, color: '#999' },
-  modalBody: { paddingHorizontal: 20, paddingTop: 15 },
-  formGroup: { marginBottom: 20 },
-  formLabel: { fontSize: 14, fontWeight: '600', color: '#2a2a2a', marginBottom: 8 },
-  formInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#2a2a2a' },
-  frequencyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f0f0f0' },
-  categoryOptionActive: { backgroundColor: '#c9a876' },
-  categoryOptionText: { fontSize: 13, fontWeight: '500', color: '#2a2a2a' },
-  categoryOptionTextActive: { color: '#fff' },
-  peopleScroll: { marginHorizontal: -20, paddingHorizontal: 20 },
-  peopleOption: { marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f0f0f0' },
-  peopleOptionText: { fontSize: 13, fontWeight: '500', color: '#2a2a2a' },
-  modalActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#2a2a2a' },
-  confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#c9a876', alignItems: 'center' },
-  confirmBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  taskActionBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  taskActionIcon: { fontSize: 15, lineHeight: 18 },
+  trackingTitle: { fontSize: 17, fontWeight: '700', color: Sheet.title, marginBottom: Spacing.xs },
+  trackingSubtitle: { fontSize: 13, color: Sheet.muted, marginBottom: Spacing.lg },
+  occurrenceList: { borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Sheet.input },
+  occurrenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md - 2,
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Sheet.line,
+    gap: Spacing.sm + 2,
+  },
+  occurrenceIcon: { fontSize: 14, lineHeight: 18, width: 20, textAlign: 'center' },
+  occurrenceLabel: { fontSize: 13, fontWeight: '600', color: Sheet.title, width: 86 },
+  occurrenceStatus: { fontSize: 12, color: Sheet.muted, flex: 1 },
+  modalBottomSpacer: { height: Spacing.xxl },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  weekdayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  /** Botões de dia com largura fixa: os sete ficam numa grade regular em
+   *  vez de larguras diferentes conforme o rótulo. */
+  weekdayBtn: {
+    width: 46,
+    paddingVertical: Spacing.sm + 1,
+    borderRadius: Radius.sm,
+    backgroundColor: Sheet.input,
+    borderWidth: 1,
+    borderColor: Sheet.inputLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayText: { fontSize: 12 },
 });
