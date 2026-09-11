@@ -1,4 +1,4 @@
-import { createWorker, type Worker, type Block } from 'tesseract.js';
+import { createWorker, PSM, type Worker, type Block } from 'tesseract.js';
 import { parsePriceLabel, type ParsedPriceLabel } from '@/utils/priceParser';
 
 // OCR roda dentro do navegador, via WebAssembly. A foto não sai do aparelho:
@@ -58,12 +58,23 @@ function getWorker(): Promise<Worker> {
           progressHandler?.(message.progress);
         }
       },
-    }).catch((error) => {
-      // Sem isso uma falha de rede no primeiro uso ficaria memorizada e todas
-      // as tentativas seguintes reutilizariam a promise rejeitada.
-      workerPromise = null;
-      throw error;
-    });
+    })
+      .then(async (worker) => {
+        // O tesseract.js assume PSM 6 (bloco único) por padrão, diferente do
+        // Tesseract de linha de comando. Isso quebra justamente a foto que a
+        // pessoa tira no corredor, com as etiquetas vizinhas no enquadramento:
+        // em PSM 6 o nome do produto sai como lixo ("Seo | Arsogio Oro Ns:").
+        // SPARSE_TEXT procura texto espalhado pela imagem e resolve esse caso
+        // sem perder nada nos demais.
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+        return worker;
+      })
+      .catch((error) => {
+        // Sem isso uma falha de rede no primeiro uso ficaria memorizada e todas
+        // as tentativas seguintes reutilizariam a promise rejeitada.
+        workerPromise = null;
+        throw error;
+      });
   }
   return workerPromise;
 }
