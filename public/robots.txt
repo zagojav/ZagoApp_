@@ -1,0 +1,3 @@
+# App privado da família Zago — não deve ser indexado por buscador nenhum.
+User-agent: *
+Disallow: /

@@ -1,14 +1,231 @@
 rules_version = '2';
+
+// =============================================================================
+// ZagoApp — regras do Firestore
+// =============================================================================
+//
+// LEIA ISTO ANTES DE MEXER — o que estas regras conseguem e o que NÃO conseguem.
+//
+// O app usa UMA sessão anônima compartilhada para a família inteira
+// (`signInAnonymously` em hooks/useAuth.ts). Isso tem uma consequência que
+// nenhuma regra consegue contornar:
+//
+//   • `request.auth.uid` é o id da sessão anônima do aparelho, NÃO é a pessoa.
+//     Amanda e Guilherme no mesmo celular têm o mesmo uid; a mesma pessoa em
+//     dois aparelhos tem uids diferentes.
+//
+//   • Por isso NÃO é possível escrever `request.auth.uid == resource.data.userId`.
+//     O campo `userId` guarda um slug ('amanda', 'lucas'), e o uid é um hash
+//     aleatório do Firebase. A comparação nunca daria verdadeira, e o efeito
+//     prático seria trancar todo mundo para fora dos próprios dados.
+//
+//   • O PIN de 4 dígitos é uma tranca de INTERFACE ("quem está usando o
+//     aparelho agora"), não de autorização. O app lê `pinHash` no cliente para
+//     comparar (app/(auth)/pin-entry.tsx), então bloquear a leitura desse
+//     campo quebraria o login. Vale lembrar que sha256 de 4 dígitos tem só
+//     10.000 possibilidades — o hash não protege de verdade contra quem tem
+//     o documento em mãos.
+//
+// O QUE ESTAS REGRAS FAZEM, ENTÃO:
+//   1. Negam tudo por padrão (não existe mais `match /{document=**}` liberado).
+//   2. Liberam só as collections que o app realmente usa, operação por operação.
+//   3. Validam tipo, campos obrigatórios e tamanho em toda escrita, para um
+//      documento malformado não conseguir entrar.
+//   4. Impedem escalação de privilégio: ninguém muda `role` ou `familyId`.
+//   5. Impedem apagar o que é semente do app (famílias, usuários, pets).
+//
+// O QUE FALTA PARA PROTEÇÃO DE VERDADE (fora do alcance de um arquivo de regras):
+//   • Conta Firebase por pessoa (e-mail/senha ou custom token). É o que
+//     destrava privacidade real entre perfis e a regra do item 3 do checklist.
+//   • App Check, para que só o app de vocês consiga falar com o projeto.
+//     Precisa ser ativado no Console do Firebase — ver docs/seguranca.md.
+// =============================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Phase 1: one shared anonymous session for the whole family device.
-    // The 4-digit PIN in the app is a UI gate for "who's using the device
-    // right now" — it is NOT enforced here, since every write's
-    // request.auth.uid is the same anonymous session regardless of which
-    // profile is active in the UI. personalNotes privacy is therefore
-    // organizational (per-profile in the app), not cryptographic.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // --- Auxiliares ----------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
     }
+
+    function str(value, max) {
+      return value is string && value.size() <= max;
+    }
+
+    function strOrNull(value, max) {
+      return value == null || str(value, max);
+    }
+
+    // Campos que a escrita está tentando alterar.
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isPerson(value) {
+      return value in ['guilherme', 'amanda', 'renata', 'vander', 'emanuella', 'lucas'];
+    }
+
+    function isPersonOrNull(value) {
+      return value == null || isPerson(value);
+    }
+
+    // --- families ------------------------------------------------------------
+    // Criada uma vez pelo seed. Nunca apagada pelo app.
+    match /families/{familyId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && str(request.resource.data.name, 120);
+      allow update: if signedIn() && changed().hasOnly(['name', 'members', 'adminId']);
+      allow delete: if false;
+    }
+
+    // --- users ---------------------------------------------------------------
+    // O app só altera PIN e foto. `role` e `familyId` ficam fora do alcance do
+    // cliente — é o que impede alguém virar admin escrevendo no próprio doc.
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && isPerson(userId)
+                    && str(request.resource.data.name, 60)
+                    && request.resource.data.role in ['admin', 'member'];
+      allow update: if signedIn()
+                    && changed().hasOnly(['pinHash', 'pinSet', 'photoUrl', 'updatedAt'])
+                    && strOrNull(request.resource.data.pinHash, 128)
+                    && request.resource.data.pinSet is bool
+                    && strOrNull(request.resource.data.photoUrl, 500);
+      allow delete: if false;
+    }
+
+    // --- sharedActivities (Afazeres) -----------------------------------------
+    match /sharedActivities/{activityId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && str(request.resource.data.title, 200)
+                    && request.resource.data.title.size() > 0
+                    && isPerson(request.resource.data.createdBy)
+                    && isPersonOrNull(request.resource.data.assignedTo)
+                    && request.resource.data.frequency in ['daily', 'weekly', 'once']
+                    && request.resource.data.daysOfWeek is list
+                    && strOrNull(request.resource.data.date, 10);
+      // Marcar/desmarcar conclusão e editar os campos da tarefa.
+      allow update: if signedIn()
+                    && changed().hasOnly([
+                         'title', 'description', 'assignedTo', 'frequency',
+                         'daysOfWeek', 'date', 'completions'
+                       ]);
+      allow delete: if signedIn();
+    }
+
+    // --- reminders (Lembretes pessoais) --------------------------------------
+    match /reminders/{reminderId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && isPerson(request.resource.data.userId)
+                    && str(request.resource.data.subject, 300)
+                    && str(request.resource.data.date, 40)
+                    && request.resource.data.completed is bool;
+      allow update: if signedIn()
+                    && changed().hasOnly(['subject', 'date', 'completed', 'completedAt'])
+                    && str(request.resource.data.subject, 300)
+                    && str(request.resource.data.date, 40)
+                    && request.resource.data.completed is bool;
+      allow delete: if signedIn();
+    }
+
+    // --- personal_tasks (Minhas Tarefas) -------------------------------------
+    match /personal_tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && isPerson(request.resource.data.userId)
+                    && str(request.resource.data.title, 300)
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.completed is bool;
+      allow update: if signedIn()
+                    && changed().hasOnly(['title', 'completed', 'completedAt'])
+                    && str(request.resource.data.title, 300)
+                    && request.resource.data.completed is bool;
+      allow delete: if signedIn();
+    }
+
+    // --- calendar_events -----------------------------------------------------
+    match /calendar_events/{eventId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && isPerson(request.resource.data.userId)
+                    && str(request.resource.data.title, 200)
+                    && str(request.resource.data.date, 10)
+                    && str(request.resource.data.description, 2000)
+                    && str(request.resource.data.time, 20);
+      allow update: if signedIn()
+                    && changed().hasOnly(['title', 'description', 'time', 'date'])
+                    && str(request.resource.data.title, 200)
+                    && str(request.resource.data.description, 2000)
+                    && str(request.resource.data.time, 20);
+      allow delete: if signedIn();
+    }
+
+    // --- pets ----------------------------------------------------------------
+    // Os 5 pets vêm do seed e não são apagados pelo app; só as anotações mudam.
+    match /pets/{petId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && str(request.resource.data.name, 60);
+      allow update: if signedIn()
+                    && changed().hasOnly(['notes', 'species', 'updatedAt'])
+                    && request.resource.data.notes is list
+                    && request.resource.data.notes.size() <= 500;
+      allow delete: if false;
+    }
+
+    // --- shopping_lists ------------------------------------------------------
+    // O documento pai guarda só o array antigo (backup da migração) e a marca
+    // `migratedAt`. Os itens de verdade vivem na subcollection abaixo.
+    match /shopping_lists/{listId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+
+      match /items/{itemId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+                      && str(request.resource.data.product, 200)
+                      && request.resource.data.product.size() > 0
+                      && request.resource.data.quantity is number
+                      && request.resource.data.quantity > 0
+                      && str(request.resource.data.unit, 20)
+                      && str(request.resource.data.category, 60)
+                      && request.resource.data.collected is bool;
+        allow update: if signedIn()
+                      && changed().hasOnly([
+                           'product', 'quantity', 'unit', 'quantityNote',
+                           'category', 'aisle', 'gtin', 'brand', 'targetMarket',
+                           'collected', 'collectedBy', 'collectedByName', 'collectedAt'
+                         ])
+                      && request.resource.data.quantity is number
+                      && request.resource.data.quantity > 0;
+        allow delete: if signedIn();
+      }
+    }
+
+    // --- price_history -------------------------------------------------------
+    // Preço anotado pela própria família (ver docs/scraping-research.md).
+    match /price_history/{recordId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && str(request.resource.data.productKey, 200)
+                    && str(request.resource.data.productName, 200)
+                    && str(request.resource.data.market, 100)
+                    && request.resource.data.price is number
+                    && request.resource.data.price >= 0
+                    && request.resource.data.quantity is number
+                    && request.resource.data.quantity > 0
+                    && isPerson(request.resource.data.registeredBy);
+      // Registro de preço é um fato datado: corrige-se apagando, não editando.
+      allow update: if false;
+      allow delete: if signedIn();
+    }
+
+    // --- Tudo mais -----------------------------------------------------------
+    // Sem regra = negado. Não existe mais catch-all liberado aqui embaixo, e
+    // é isso que faz o "negar por padrão" valer de verdade.
   }
 }

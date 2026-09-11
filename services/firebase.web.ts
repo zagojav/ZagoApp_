@@ -32,3 +32,28 @@ try {
 export const auth: Auth = authInstance;
 
 export const db: Firestore = getFirestore(app);
+
+// --- App Check (opcional, desligado até existir uma chave) -------------------
+//
+// A API key do Firebase é pública por natureza em app client-side — ela
+// identifica o projeto, não autentica ninguém. Quem impede um script
+// qualquer de falar com o projeto é o App Check, não a chave.
+//
+// Este bloco fica INERTE enquanto `EXPO_PUBLIC_RECAPTCHA_SITE_KEY` não
+// existir, de propósito: ativar App Check pela metade (código no cliente sem
+// registro no Console, ou enforcement ligado no Console sem chave aqui)
+// derruba todas as chamadas ao Firestore. O passo a passo para ligar está em
+// docs/seguranca.md.
+const recaptchaSiteKey = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY;
+if (recaptchaSiteKey) {
+  import('firebase/app-check')
+    .then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    })
+    .catch((error) => {
+      console.error('Não foi possível iniciar o App Check:', error);
+    });
+}
