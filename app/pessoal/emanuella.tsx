@@ -1,31 +1,32 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   TextInput,
   Modal,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedActivities, getActivitiesForPerson, relevantDateKeyForToday, isCompletedOnDate } from '@/hooks/useSharedActivities';
 import { useReminders } from '@/hooks/useReminders';
+import { usePersonalTasks, type PersonalTask } from '@/hooks/usePersonalTasks';
 import { OverdueTasksBanner } from '@/components/OverdueTasksBanner';
+import { makeProfileStyles } from '@/constants/profileStyles';
+import { PROFILE_THEMES } from '@/constants/profileTheme';
+import { Sheet } from '@/constants/design';
+import { showConfirm } from '@/utils/alert';
 import type { Reminder } from '@/types/database';
 
-interface PersonalTask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
+const theme = PROFILE_THEMES.emanuella;
 
 export default function EmanuellaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [tasks, setTasks] = useState<PersonalTask[]>([]);
+  const styles = useMemo(() => makeProfileStyles(theme), []);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [noteModalVisible, setNoteModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -33,50 +34,54 @@ export default function EmanuellaScreen() {
   const [formTaskTitle, setFormTaskTitle] = useState('');
   const [formNoteSubject, setFormNoteSubject] = useState('');
   const [formNoteDate, setFormNoteDate] = useState('');
+  const [showCompletedNotes, setShowCompletedNotes] = useState(false);
   const { activities, toggleCompletion } = useSharedActivities();
   const myActivities = getActivitiesForPerson(activities, 'emanuella');
-  const { reminders, addReminder, updateReminder, completeReminder, deleteReminder } = useReminders('emanuella');
+  const { tasks, loading: tasksLoading, addTask, renameTask, toggleTask, deleteTask } = usePersonalTasks('emanuella');
+  const {
+    reminders,
+    completed: completedReminders,
+    loading: remindersLoading,
+    addReminder,
+    updateReminder,
+    completeReminder,
+    uncompleteReminder,
+    deleteReminder,
+  } = useReminders('emanuella');
 
   const completedTasks = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length;
   const completionPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
   // === TAREFAS PESSOAIS ===
-  const handleAddTask = () => {
-    if (!formTaskTitle.trim()) {
+  const handleAddTask = async () => {
+    const title = formTaskTitle.trim();
+    if (!title) {
       setTaskModalVisible(false);
       return;
     }
 
-    setTasks(prev => {
-      if (editingTaskId) {
-        return prev.map(t =>
-          t.id === editingTaskId ? { ...t, title: formTaskTitle } : t
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          title: formTaskTitle,
-          completed: false,
-        },
-      ];
-    });
+    if (editingTaskId) {
+      await renameTask(editingTaskId, title);
+    } else {
+      await addTask(title);
+    }
 
     setTaskModalVisible(false);
     setEditingTaskId(null);
     setFormTaskTitle('');
   };
 
-  const handleToggleTask = (id: string) => {
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t))
+  const handleDeleteTask = (task: PersonalTask) => {
+    showConfirm(
+      {
+        title: 'Excluir tarefa',
+        message: `Excluir "${task.title}"? Isso não tem como desfazer.`,
+        confirmText: 'Excluir',
+        destructive: true,
+      },
+      () => { deleteTask(task.id); }
     );
-  };
-
-  const handleDeleteTask = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
   };
 
   const openTaskEditModal = (task: PersonalTask) => {
@@ -91,7 +96,7 @@ export default function EmanuellaScreen() {
     setTaskModalVisible(true);
   };
 
-  // === NOTAS PESSOAIS ===
+  // === LEMBRETES ===
   const handleAddNote = async () => {
     if (!formNoteSubject.trim() && !formNoteDate.trim()) {
       setNoteModalVisible(false);
@@ -110,8 +115,16 @@ export default function EmanuellaScreen() {
     setFormNoteDate('');
   };
 
-  const handleDeleteNote = (id: string) => {
-    deleteReminder(id);
+  const handleDeleteNote = (reminder: Reminder) => {
+    showConfirm(
+      {
+        title: 'Excluir lembrete',
+        message: `Excluir "${reminder.subject}"? Isso não tem como desfazer.`,
+        confirmText: 'Excluir',
+        destructive: true,
+      },
+      () => { deleteReminder(reminder.id); }
+    );
   };
 
   const openNoteEditModal = (reminder: Reminder) => {
@@ -147,14 +160,12 @@ export default function EmanuellaScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerName}>Emanuella</Text>
-          <Text style={styles.headerSubtitle}>👋 Olá, Emanuella!</Text>
-        </View>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={styles.headerName} numberOfLines={1}>Emanuella</Text>
+        <Text style={styles.headerSubtitle}>👋 Olá, Emanuella!</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
         <OverdueTasksBanner personId="emanuella" />
         {/* Card Estatísticas */}
         <View style={styles.statsCard}>
@@ -172,6 +183,12 @@ export default function EmanuellaScreen() {
         {/* Barra de Progresso */}
         {totalTasks > 0 && (
           <View style={styles.progressContainer}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>Progresso do dia</Text>
+              <Text style={styles.progressText}>
+                {Math.round(completionPercentage)}% completo
+              </Text>
+            </View>
             <View style={styles.progressBar}>
               <View
                 style={[
@@ -180,9 +197,6 @@ export default function EmanuellaScreen() {
                 ]}
               />
             </View>
-            <Text style={styles.progressText}>
-              {Math.round(completionPercentage)}% completo
-            </Text>
           </View>
         )}
 
@@ -194,37 +208,49 @@ export default function EmanuellaScreen() {
         {/* Seção Tarefas Pessoais */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📋 Minhas Tarefas</Text>
+            <Text style={styles.sectionTitle}>Minhas tarefas</Text>
             <TouchableOpacity
               style={styles.addSmallBtn}
               onPress={openTaskNewModal}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Adicionar tarefa"
             >
               <Text style={styles.addSmallIcon}>+</Text>
             </TouchableOpacity>
           </View>
 
-          {tasks.length === 0 && myActivities.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhuma tarefa adicionada</Text>
+          {tasksLoading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={theme.onCardAccent} />
+            </View>
+          ) : tasks.length === 0 && myActivities.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>Nenhuma tarefa ainda.{'\n'}Toque no + para adicionar a primeira.</Text>
+            </View>
           ) : (
             <>
               {myActivities.map(activity => {
                 const dateKey = relevantDateKeyForToday(activity);
-                const completed = isCompletedOnDate(activity, dateKey);
+                const done = isCompletedOnDate(activity, dateKey);
                 return (
                   <TouchableOpacity
                     key={activity.id}
-                    style={[styles.taskItem, completed && styles.taskItemCompleted]}
+                    style={[styles.taskItem, done && styles.taskItemCompleted]}
                     onPress={() => toggleCompletion(activity, dateKey, 'emanuella', 'Emanuella')}
                     activeOpacity={0.7}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: done }}
+                    accessibilityLabel={activity.title}
                   >
-                    <View style={styles.taskCheckbox}>
-                      {completed && <Text style={styles.taskCheckmark}>✓</Text>}
+                    <View style={[styles.taskCheckbox, done && styles.taskCheckboxDone]}>
+                      {done && <Text style={styles.taskCheckmark}>✓</Text>}
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.taskText, completed && styles.taskTextCompleted]}>
+                    <View style={styles.taskBody}>
+                      <Text style={[styles.taskText, done && styles.taskTextCompleted]}>
                         {activity.title}
                       </Text>
-                      <Text style={styles.orgTaskBadge}>🏠 Atividade da casa</Text>
+                      <Text style={styles.orgTaskBadge}>🏠 ATIVIDADE DA CASA</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -233,30 +259,42 @@ export default function EmanuellaScreen() {
                 <TouchableOpacity
                   key={task.id}
                   style={[styles.taskItem, task.completed && styles.taskItemCompleted]}
-                  onPress={() => handleToggleTask(task.id)}
+                  onPress={() => toggleTask(task)}
                   activeOpacity={0.7}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: task.completed }}
+                  accessibilityLabel={task.title}
                 >
-                  <View style={styles.taskCheckbox}>
+                  <View style={[styles.taskCheckbox, task.completed && styles.taskCheckboxDone]}>
                     {task.completed && <Text style={styles.taskCheckmark}>✓</Text>}
                   </View>
-                  <Text
-                    style={[
-                      styles.taskText,
-                      task.completed && styles.taskTextCompleted,
-                    ]}
-                  >
-                    {task.title}
-                  </Text>
+                  <View style={styles.taskBody}>
+                    <Text
+                      style={[
+                        styles.taskText,
+                        task.completed && styles.taskTextCompleted,
+                      ]}
+                    >
+                      {task.title}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => openTaskEditModal(task)}
-                    style={styles.taskEditBtn}
+                    style={styles.taskActionBtn}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar ${task.title}`}
                   >
-                    <Text style={styles.taskEditIcon}>✏️</Text>
+                    <Text style={styles.taskActionIcon}>✏️</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => handleDeleteTask(task.id)}
+                    onPress={() => handleDeleteTask(task)}
+                    style={styles.taskActionBtn}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Excluir ${task.title}`}
                   >
-                    <Text style={styles.taskDeleteIcon}>🗑️</Text>
+                    <Text style={styles.taskActionIcon}>🗑️</Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
@@ -264,27 +302,36 @@ export default function EmanuellaScreen() {
           )}
         </View>
 
-        {/* Seção Lembretes / Notas */}
+        {/* Seção Lembretes */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📝 Lembretes</Text>
+            <Text style={styles.sectionTitle}>Lembretes</Text>
             <TouchableOpacity
               style={styles.addSmallBtn}
               onPress={openNoteNewModal}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Adicionar lembrete"
             >
               <Text style={styles.addSmallIcon}>+</Text>
             </TouchableOpacity>
           </View>
 
-          {reminders.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum lembrete adicionado</Text>
+          {remindersLoading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator color={theme.onCardAccent} />
+            </View>
+          ) : reminders.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>Nenhum lembrete em aberto.{'\n'}Toque no + para adicionar.</Text>
+            </View>
           ) : (
             <View style={styles.notesTable}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderText, { width: 30 }]} />
-                <Text style={[styles.tableHeaderText, { flex: 2 }]}>Assunto</Text>
-                <Text style={[styles.tableHeaderText, { flex: 1 }]}>Data</Text>
-                <Text style={[styles.tableHeaderText, { width: 60 }]} />
+                <View style={styles.colCheck} />
+                <Text style={[styles.tableHeaderText, styles.colSubject]}>Assunto</Text>
+                <Text style={[styles.tableHeaderText, styles.colDate]}>Data</Text>
+                <View style={styles.colActions} />
               </View>
               {reminders.map(reminder => (
                 <TouchableOpacity
@@ -292,22 +339,29 @@ export default function EmanuellaScreen() {
                   style={styles.tableRow}
                   onPress={() => openNoteEditModal(reminder)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Editar lembrete ${reminder.subject}`}
                 >
                   <TouchableOpacity
                     onPress={() => completeReminder(reminder.id)}
                     style={styles.reminderCheckbox}
-                  >
-                    <Text style={styles.reminderCheckIcon}>✓</Text>
-                  </TouchableOpacity>
-                  <Text style={[styles.cellText, { flex: 2 }]}>
+                    activeOpacity={0.6}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: false }}
+                    accessibilityLabel={`Concluir ${reminder.subject}`}
+                  />
+                  <Text style={[styles.cellText, styles.colSubject]} numberOfLines={2}>
                     {reminder.subject}
                   </Text>
-                  <Text style={[styles.cellText, { flex: 1 }]}>
+                  <Text style={[styles.cellDate, styles.colDate]}>
                     {reminder.date}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleDeleteNote(reminder.id)}
+                    onPress={() => handleDeleteNote(reminder)}
                     style={styles.deleteNoteBtn}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Excluir ${reminder.subject}`}
                   >
                     <Text style={styles.deleteNoteIcon}>🗑️</Text>
                   </TouchableOpacity>
@@ -315,39 +369,104 @@ export default function EmanuellaScreen() {
               ))}
             </View>
           )}
+
+          {/* Concluídos — ficam acessíveis para reabrir. Marcar um lembrete
+              como feito costumava fazê-lo sumir sem deixar rastro. */}
+          {completedReminders.length > 0 && (
+            <>
+              <TouchableOpacity
+                style={styles.completedToggle}
+                onPress={() => setShowCompletedNotes(v => !v)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={showCompletedNotes ? 'Esconder concluídos' : 'Mostrar concluídos'}
+              >
+                <Text style={styles.completedToggleText}>
+                  {showCompletedNotes ? '▾' : '▸'}  Concluídos ({completedReminders.length})
+                </Text>
+              </TouchableOpacity>
+
+              {showCompletedNotes && (
+                <View style={styles.notesTable}>
+                  {completedReminders.map(reminder => (
+                    <View key={reminder.id} style={styles.tableRow}>
+                      <TouchableOpacity
+                        onPress={() => uncompleteReminder(reminder.id)}
+                        style={[styles.reminderCheckbox, styles.reminderCheckboxDone]}
+                        activeOpacity={0.6}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: true }}
+                        accessibilityLabel={`Reabrir ${reminder.subject}`}
+                      >
+                        <Text style={styles.reminderCheckIcon}>✓</Text>
+                      </TouchableOpacity>
+                      <Text style={[styles.cellText, styles.colSubject, styles.cellTextDone]} numberOfLines={2}>
+                        {reminder.subject}
+                      </Text>
+                      <Text style={[styles.cellDate, styles.colDate]}>
+                        {reminder.date}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteNote(reminder)}
+                        style={styles.deleteNoteBtn}
+                        activeOpacity={0.6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Excluir ${reminder.subject}`}
+                      >
+                        <Text style={styles.deleteNoteIcon}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         {/* Links para Outras Abas */}
         <View style={styles.quickLinksSection}>
-          <Text style={styles.sectionTitle}>🔗 Acesso Rápido</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Acesso rápido</Text>
+          </View>
           <View style={styles.linksContainer}>
             <TouchableOpacity
               style={styles.quickLink}
               onPress={() => router.push('/afazeres')}
+              activeOpacity={0.75}
+              accessibilityRole="link"
             >
               <Text style={styles.quickLinkText}>Afazeres da Casa</Text>
+              <Text style={styles.quickLinkChevron}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickLink}
               onPress={() => router.push('/listas')}
+              activeOpacity={0.75}
+              accessibilityRole="link"
             >
               <Text style={styles.quickLinkText}>Listas</Text>
+              <Text style={styles.quickLinkChevron}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickLink}
               onPress={() => router.push('/calendario/calendarioE')}
+              activeOpacity={0.75}
+              accessibilityRole="link"
             >
               <Text style={styles.quickLinkText}>Meu Calendário</Text>
+              <Text style={styles.quickLinkChevron}>›</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Foto Mariecat Footer */}
+        {/* Ilustração do rodapé */}
         <View style={styles.footerContainer}>
           <Image
             source={require('@/assets/images/mariecat.png')}
-            style={styles.mariecatImage}
+            style={styles.footerImage}
             resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="Ilustração do perfil"
           />
         </View>
       </ScrollView>
@@ -361,25 +480,30 @@ export default function EmanuellaScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalGrabber} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingTaskId ? 'Editar Tarefa' : 'Nova Tarefa'}
+                {editingTaskId ? 'Editar tarefa' : 'Nova tarefa'}
               </Text>
-              <TouchableOpacity onPress={() => setTaskModalVisible(false)}>
-                <Text style={styles.closeModal}>✕</Text>
+              <TouchableOpacity style={styles.closeModal} onPress={() => setTaskModalVisible(false)} activeOpacity={0.6} accessibilityRole="button" accessibilityLabel="Fechar">
+                <Text style={styles.closeModalIcon}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalBody}>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Descrição da Tarefa</Text>
+                <Text style={styles.label}>Descrição da tarefa</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ex: Estudar, ler, exercitar..."
+                  placeholder="Ex: estudar, ler, exercitar..."
                   value={formTaskTitle}
                   onChangeText={setFormTaskTitle}
-                  placeholderTextColor="#ccc"
+                  placeholderTextColor={Sheet.placeholder}
+                  accessibilityLabel="Descrição da tarefa"
                 />
+                {!formTaskTitle.trim() && (
+                  <Text style={styles.fieldHint}>Escreva algo para poder salvar.</Text>
+                )}
               </View>
             </View>
 
@@ -387,12 +511,15 @@ export default function EmanuellaScreen() {
               <TouchableOpacity
                 style={styles.cancelBtn}
                 onPress={() => setTaskModalVisible(false)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cancelBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmBtn}
+                style={[styles.confirmBtn, !formTaskTitle.trim() && styles.confirmBtnDisabled]}
                 onPress={handleAddTask}
+                disabled={!formTaskTitle.trim()}
+                activeOpacity={0.85}
               >
                 <Text style={styles.confirmBtnText}>Salvar</Text>
               </TouchableOpacity>
@@ -401,7 +528,7 @@ export default function EmanuellaScreen() {
         </View>
       </Modal>
 
-      {/* Modal Nota */}
+      {/* Modal Lembrete */}
       <Modal
         visible={noteModalVisible}
         transparent
@@ -410,12 +537,13 @@ export default function EmanuellaScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalGrabber} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingNoteId ? 'Editar Lembrete' : 'Novo Lembrete'}
+                {editingNoteId ? 'Editar lembrete' : 'Novo lembrete'}
               </Text>
-              <TouchableOpacity onPress={() => setNoteModalVisible(false)}>
-                <Text style={styles.closeModal}>✕</Text>
+              <TouchableOpacity style={styles.closeModal} onPress={() => setNoteModalVisible(false)} activeOpacity={0.6} accessibilityRole="button" accessibilityLabel="Fechar">
+                <Text style={styles.closeModalIcon}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -424,10 +552,11 @@ export default function EmanuellaScreen() {
                 <Text style={styles.label}>Assunto</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ex: Médico, Prova, Pagamento..."
+                  placeholder="Ex: médico, prova, pagamento..."
                   value={formNoteSubject}
                   onChangeText={setFormNoteSubject}
-                  placeholderTextColor="#ccc"
+                  placeholderTextColor={Sheet.placeholder}
+                  accessibilityLabel="Assunto do lembrete"
                 />
               </View>
 
@@ -438,21 +567,32 @@ export default function EmanuellaScreen() {
                   placeholder="Ex: 05/02/2026"
                   value={formNoteDate}
                   onChangeText={setFormNoteDate}
-                  placeholderTextColor="#ccc"
+                  placeholderTextColor={Sheet.placeholder}
+                  accessibilityLabel="Data do lembrete"
                 />
               </View>
+
+              {!formNoteSubject.trim() && !formNoteDate.trim() && (
+                <Text style={styles.fieldHint}>Preencha ao menos o assunto ou a data.</Text>
+              )}
             </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.cancelBtn}
                 onPress={() => setNoteModalVisible(false)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cancelBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmBtn}
+                style={[
+                  styles.confirmBtn,
+                  !formNoteSubject.trim() && !formNoteDate.trim() && styles.confirmBtnDisabled,
+                ]}
                 onPress={handleAddNote}
+                disabled={!formNoteSubject.trim() && !formNoteDate.trim()}
+                activeOpacity={0.85}
               >
                 <Text style={styles.confirmBtnText}>Salvar</Text>
               </TouchableOpacity>
@@ -464,351 +604,3 @@ export default function EmanuellaScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    backgroundColor: '#E83E8C', // rosa forte
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#FCE4EC',
-    marginTop: 4,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-  },
-  statsCard: {
-    backgroundColor: '#E83E8C',
-    borderRadius: 16,
-    paddingVertical: 16,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  statNumber: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: 'rgba(233, 30, 99, 0.15)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#E83E8C',
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#E83E8C',
-    fontWeight: '600',
-  },
-  motivationalCard: {
-    backgroundColor: '#FCE4EC', // rosa pastel
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E83E8C',
-  },
-  motivationalText: {
-    fontSize: 13,
-    color: '#C71A6C',
-    fontWeight: '500',
-    fontStyle: 'italic',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#E83E8C',
-  },
-  addSmallBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E83E8C',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addSmallIcon: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  emptyText: {
-    fontSize: 13,
-    color: '#666666',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  taskItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FCE4EC',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-  },
-  taskItemCompleted: {
-    backgroundColor: '#FFFFFF',
-    opacity: 0.8,
-  },
-  taskCheckbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#E83E8C',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  taskCheckmark: {
-    fontSize: 12,
-    color: '#E83E8C',
-    fontWeight: 'bold',
-  },
-  taskText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
-  },
-  orgTaskBadge: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#C71A6C',
-    marginTop: 2,
-  },
-  taskTextCompleted: {
-    color: '#999999',
-    textDecorationLine: 'line-through',
-  },
-  taskEditBtn: {
-    marginRight: 8,
-  },
-  taskEditIcon: {
-    fontSize: 16,
-  },
-  taskDeleteIcon: {
-    fontSize: 16,
-  },
-  notesTable: {
-    backgroundColor: '#FCE4EC',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(233, 30, 99, 0.1)',
-    backgroundColor: '#F8BBD0',
-  },
-  tableHeaderText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#C71A6C',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(233, 30, 99, 0.05)',
-  },
-  cellText: {
-    fontSize: 12,
-    color: '#000000',
-  },
-  deleteNoteBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reminderCheckbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#E83E8C',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reminderCheckIcon: {
-    fontSize: 10,
-    color: '#E83E8C',
-    fontWeight: 'bold',
-  },
-  deleteNoteIcon: {
-    fontSize: 14,
-  },
-  quickLinksSection: {
-    marginBottom: 30,
-  },
-  linksContainer: {
-    gap: 10,
-    marginTop: 12,
-  },
-  quickLink: {
-    backgroundColor: '#FCE4EC',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderLeftWidth: 3,
-    borderLeftColor: '#E83E8C',
-  },
-  quickLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#C71A6C',
-  },
-  footerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 30,
-    backgroundColor: '#FFFFFF',
-  },
-  mariecatImage: {
-    width: '100%',
-    height: 270,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2a2a2a',
-  },
-  closeModal: {
-    fontSize: 24,
-    color: '#999',
-  },
-  modalBody: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2a2a2a',
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#2a2a2a',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 20,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2a2a2a',
-  },
-  confirmBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#E83E8C',
-    alignItems: 'center',
-  },
-  confirmBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});

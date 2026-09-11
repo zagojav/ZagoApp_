@@ -8,9 +8,16 @@ import { Timestamp } from 'firebase/firestore';
 import { usePets } from '@/hooks/usePets';
 import { useActiveProfile } from '@/hooks/useActiveProfile';
 import { PERSON_PROFILES } from '@/constants/personProfiles';
+import { casa } from '@/constants/casaStyles';
+import { showConfirm } from '@/utils/alert';
+import { Casa, HEADER_MENU_SLOT, Radius, Sheet, Spacing, shadow } from '@/constants/design';
 import type { PetNote } from '@/types/database';
 
 type PetKey = 'Arya' | 'Oliver' | 'Aurora' | 'Nico' | 'Stan';
+
+/** Inicial do nome no lugar de um ícone genérico: identifica o bicho sem
+ *  inventar espécie nem repetir a mesma figurinha cinco vezes. */
+const initial = (pet: PetKey) => pet.charAt(0);
 
 export default function PetsScreen() {
   const insets = useSafeAreaInsets();
@@ -55,40 +62,65 @@ export default function PetsScreen() {
     setFormDate('');
   };
 
-  const handleDeleteNote = (pet: PetKey, id: string) => {
-    saveNotes(pet.toLowerCase(), getNotes(pet).filter(n => n.id !== id));
+  const handleDeleteNote = (pet: PetKey, note: PetNote) => {
+    showConfirm(
+      {
+        title: 'Excluir anotação',
+        message: `Excluir "${note.subject}" de ${pet}? Isso não tem como desfazer.`,
+        confirmText: 'Excluir',
+        destructive: true,
+      },
+      () => { saveNotes(pet.toLowerCase(), getNotes(pet).filter(n => n.id !== note.id)); }
+    );
   };
 
-  const PetBlock = ({ pet }: { pet: PetKey }) => (
-    <View style={styles.petBlock}>
-      <Text style={styles.petName}>{pet}</Text>
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableHeaderText, { flex: 2 }]}>Assunto</Text>
-        <Text style={[styles.tableHeaderText, { flex: 1 }]}>Data</Text>
-        <Text style={[styles.tableHeaderText, { width: 40 }]} />
-      </View>
-      {getNotes(pet).map(note => (
-        <TouchableOpacity key={note.id} style={styles.tableRow} onPress={() => openEditNote(pet, note)} activeOpacity={0.7}>
-          <Text style={[styles.cellText, { flex: 2 }]}>{note.subject}</Text>
-          <Text style={[styles.cellText, { flex: 1 }]}>{note.date}</Text>
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteNote(pet, note.id)}>
-            <Text style={styles.deleteIcon}>🗑️</Text>
-          </TouchableOpacity>
+  const PetBlock = ({ pet }: { pet: PetKey }) => {
+    const notes = getNotes(pet);
+    return (
+      <View style={styles.petBlock}>
+        <View style={styles.petHeader}>
+          <View style={styles.petAvatar}>
+            <Text style={styles.petInitial}>{initial(pet)}</Text>
+          </View>
+          <Text style={styles.petName}>{pet}</Text>
+          <Text style={styles.petCount}>
+            {notes.length} {notes.length === 1 ? 'anotação' : 'anotações'}
+          </Text>
+        </View>
+
+        {notes.length > 0 && (
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderText, styles.colSubject]}>Assunto</Text>
+              <Text style={[styles.tableHeaderText, styles.colDate]}>Data</Text>
+              <View style={styles.colActions} />
+            </View>
+            {notes.map(note => (
+              <TouchableOpacity key={note.id} style={styles.tableRow} onPress={() => openEditNote(pet, note)} activeOpacity={0.7}>
+                <Text style={[styles.cellText, styles.colSubject]} numberOfLines={2}>{note.subject}</Text>
+                <Text style={[styles.cellDate, styles.colDate]}>{note.date}</Text>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteNote(pet, note)} accessibilityRole="button" accessibilityLabel={`Excluir ${note.subject}`} activeOpacity={0.6}>
+                  <Text style={styles.deleteIcon}>🗑️</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.addNoteBtn} onPress={() => openNewNote(pet)} activeOpacity={0.75}>
+          <Text style={styles.addNoteText}>+ adicionar anotação</Text>
         </TouchableOpacity>
-      ))}
-      <TouchableOpacity style={styles.addNoteBtn} onPress={() => openNewNote(pet)}>
-        <Text style={styles.addNoteText}>+ adicionar linha</Text>
-      </TouchableOpacity>
-    </View>
-  );
+      </View>
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
-        <Text style={styles.headerTitle}>Pets</Text>
+    <View style={casa.container}>
+      <View style={[casa.header, styles.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={casa.headerTitleFlex}>Pets</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PetBlock pet="Arya" />
         <PetBlock pet="Oliver" />
         <PetBlock pet="Aurora" />
@@ -97,63 +129,105 @@ export default function PetsScreen() {
       </ScrollView>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingNoteId ? 'Editar anotação' : 'Nova anotação'}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.closeModal}>✕</Text></TouchableOpacity>
+        <View style={casa.modalOverlay}>
+          <View style={casa.modalContent}>
+            <View style={casa.modalGrabber} />
+            <View style={casa.modalHeader}>
+              <Text style={casa.modalTitle}>{editingNoteId ? 'Editar anotação' : 'Nova anotação'}</Text>
+              <TouchableOpacity style={casa.closeModal} onPress={() => setModalVisible(false)} activeOpacity={0.6}>
+                <Text style={casa.closeModalIcon}>✕</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.modalBody}>
-              <Text style={styles.modalPetName}>{currentPet}</Text>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Assunto</Text>
-                <TextInput style={styles.formInput} placeholder="Ex: Vacina, banho, remédio..." value={formSubject} onChangeText={setFormSubject} placeholderTextColor="#ccc" />
+            <View style={casa.modalBody}>
+              <View style={styles.modalPetRow}>
+                <Text style={styles.modalPetInitial}>{initial(currentPet)}</Text>
+                <Text style={styles.modalPetName}>{currentPet}</Text>
               </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Data</Text>
-                <TextInput style={styles.formInput} placeholder="Ex: 05/02/2026" value={formDate} onChangeText={setFormDate} placeholderTextColor="#ccc" />
+              <View style={casa.formGroup}>
+                <Text style={casa.formLabel}>Assunto</Text>
+                <TextInput style={casa.formInput} placeholder="Ex: vacina, banho, remédio..." value={formSubject} onChangeText={setFormSubject} placeholderTextColor={Sheet.placeholder} />
+              </View>
+              <View style={casa.formGroup}>
+                <Text style={casa.formLabel}>Data</Text>
+                <TextInput style={casa.formInput} placeholder="Ex: 05/02/2026" value={formDate} onChangeText={setFormDate} placeholderTextColor={Sheet.placeholder} />
               </View>
             </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}><Text style={styles.cancelBtnText}>Cancelar</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleSaveNote}><Text style={styles.confirmBtnText}>Salvar</Text></TouchableOpacity>
+            <View style={casa.modalActions}>
+              <TouchableOpacity style={casa.cancelBtn} onPress={() => setModalVisible(false)} activeOpacity={0.7}><Text style={casa.cancelBtnText}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={casa.confirmBtn} onPress={handleSaveNote} activeOpacity={0.85}><Text style={casa.confirmBtnText}>Salvar</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#a89080' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15, backgroundColor: '#a89080' },
-  headerTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: '#2a2a2a', letterSpacing: 1 },
-  content: { paddingHorizontal: 15, paddingVertical: 20, gap: 20 },
-  petBlock: { backgroundColor: '#b69372', borderRadius: 20, padding: 14 },
-  petName: { fontSize: 18, fontWeight: '600', color: '#2a2a2a', marginBottom: 10 },
-  tableHeader: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.2)', marginBottom: 4 },
-  tableHeaderText: { fontSize: 12, fontWeight: '700', color: '#2a2a2a' },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.08)' },
-  cellText: { fontSize: 12, color: '#2a2a2a' },
-  deleteBtn: { width: 40, alignItems: 'center' },
-  deleteIcon: { fontSize: 16 },
-  addNoteBtn: { marginTop: 8, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: '#e8dcc8' },
-  addNoteText: { fontSize: 12, color: '#2a2a2a' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 10 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  modalTitle: { fontSize: 18, fontWeight: '600', color: '#2a2a2a' },
-  closeModal: { fontSize: 24, color: '#999' },
-  modalBody: { paddingHorizontal: 20, paddingTop: 10 },
-  modalPetName: { fontSize: 16, fontWeight: '600', color: '#2a2a2a', marginBottom: 12 },
-  formGroup: { marginBottom: 16 },
-  formLabel: { fontSize: 13, fontWeight: '600', color: '#2a2a2a', marginBottom: 6 },
-  formInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: '#2a2a2a' },
-  modalActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#2a2a2a' },
-  confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#c9a876', alignItems: 'center' },
-  confirmBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  header: { paddingRight: HEADER_MENU_SLOT },
+  content: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxxl, gap: Spacing.lg },
+  petBlock: {
+    backgroundColor: Casa.surfaceWarm,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    ...shadow(1),
+  },
+  petHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
+  petAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Casa.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  petInitial: { fontSize: 16, lineHeight: 20, fontWeight: '700', color: Casa.accent },
+  petName: { flex: 1, fontSize: 17, fontWeight: '600', color: Casa.ink },
+  petCount: { fontSize: 11, fontWeight: '600', color: Casa.inkMuted },
+  table: { backgroundColor: Casa.surface, borderRadius: Radius.sm, overflow: 'hidden' },
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Casa.surfaceSunken,
+    gap: Spacing.sm + 2,
+  },
+  tableHeaderText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Casa.inkMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Casa.line,
+    gap: Spacing.sm + 2,
+  },
+  /** Mesmas larguras no cabeçalho e nas linhas — é isso que mantém as
+   *  colunas da tabela no prumo. */
+  colSubject: { flex: 2 },
+  colDate: { flex: 1 },
+  colActions: { width: 30 },
+  cellText: { fontSize: 13, color: Casa.ink, fontWeight: '500' },
+  cellDate: { fontSize: 12, color: Casa.inkMuted, fontWeight: '600' },
+  deleteBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  deleteIcon: { fontSize: 14, lineHeight: 17 },
+  addNoteBtn: {
+    marginTop: Spacing.md,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.md + 2,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    backgroundColor: Casa.surface,
+  },
+  addNoteText: { fontSize: 12, color: Casa.ink, fontWeight: '600' },
+  modalPetRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg },
+  modalPetInitial: { fontSize: 15, lineHeight: 24, fontWeight: '700', color: Casa.accent, width: 28, height: 28, borderRadius: 14, backgroundColor: Casa.surfaceSunken, textAlign: 'center', overflow: 'hidden' },
+  modalPetName: { fontSize: 16, fontWeight: '700', color: Sheet.title },
 });

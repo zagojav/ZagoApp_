@@ -125,31 +125,73 @@ export interface ApostaPrediction {
 }
 
 // === shopping_lists ===
+// Categoria de VIAGEM: responde "quando comprar". É o filtro que a tela do
+// Mercado já usa — não confundir com ShoppingAisle, que responde "onde
+// fica no mercado" e serve para ordenar a lista na hora da compra.
 export type ShoppingCategory = 'Compra do mês' | 'Compra da semana' | 'Compra de necessidade';
 
-export interface ShoppingListItem {
+export type ShoppingAisle =
+  | 'Grãos'
+  | 'Frios'
+  | 'Bebidas'
+  | 'Limpeza'
+  | 'Hortifruti'
+  | 'Higiene'
+  | 'Carnes'
+  | 'Padaria'
+  | 'Outros';
+
+export type ShoppingUnit = 'un' | 'kg' | 'g' | 'L' | 'ml' | 'pacote' | 'caixa';
+
+// Um documento por item em `shopping_lists/{listId}/items/{itemId}`.
+//
+// Antes a lista inteira era um array dentro de um único documento, o que
+// fazia duas pessoas marcando itens ao mesmo tempo sobrescreverem uma à
+// outra. Com um documento por item cada escrita toca só o próprio item.
+export interface ShoppingItem {
   id: string;
   product: string;
-  quantity: string;
+  quantity: number;
+  unit: ShoppingUnit;
+  // Texto de quantidade que não deu para interpretar na migração do
+  // formato antigo (era string livre, tipo '2 pacotes grandes').
+  quantityNote: string | null;
   category: ShoppingCategory;
-  checked: boolean;
-  checkedBy: PersonId | null;
-  checkedAt: Timestamp | null;
-  checkedByName: string | null;
+  aisle: ShoppingAisle;
+  /** Código de barras. É a chave que casa o item com o Open Food Facts e,
+   *  no futuro, com qualquer fonte externa de preço. */
+  gtin: string | null;
+  brand: string | null;
+  /** Mercado escolhido para este item na hora de fechar a compra. */
+  targetMarket: string | null;
+  collected: boolean;
+  collectedBy: PersonId | null;
+  collectedByName: string | null;
+  collectedAt: Timestamp | null;
   addedBy: PersonId;
   addedByName: string;
   createdAt: Timestamp;
 }
 
-export interface ShoppingList {
+// === price_history ===
+// Um registro por vez que alguém anotou o preço de um produto num mercado.
+// É o que permite dizer "isso costuma sair mais barato no Assaí" sem
+// depender de fonte externa nenhuma.
+export interface PriceRecord {
   id: string;
   familyId: string;
-  name: string; // 'Mercado' | 'Farmácia' | custom
-  items: ShoppingListItem[];
-  shoppingNow: PersonId | null;
-  shoppingNowName: string | null;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  /** GTIN quando existe; senão, o nome do produto normalizado. É por aqui
+   *  que registros de compras diferentes se juntam no mesmo produto. */
+  productKey: string;
+  productName: string;
+  market: string;
+  /** Valor pago, em reais, pela `quantity` informada. */
+  price: number;
+  quantity: number;
+  unit: ShoppingUnit;
+  registeredBy: PersonId;
+  registeredByName: string;
+  registeredAt: Timestamp;
 }
 
 // === pets ===
