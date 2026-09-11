@@ -5,14 +5,32 @@
 // confirmação sempre deixa o usuário corrigir. Etiqueta de mercado tem fonte
 // pequena, reflexo de plástico e foto torta; errar às vezes é o esperado.
 
-/** Palavras que aparecem na etiqueta mas nunca fazem parte do nome do produto. */
-const NOISE_WORDS = [
+/**
+ * Palavras de etiqueta: indicam que a linha é preço, promoção ou código —
+ * não o nome do produto. Cada ocorrência derruba a pontuação da linha.
+ */
+const LABEL_NOISE_WORDS = [
   'r$', 'rs', 'preco', 'preço', 'oferta', 'promocao', 'promoção', 'desconto',
-  'a vista', 'à vista', 'avista', 'cada', 'unidade', 'unid', 'un', 'kg', 'g',
+  'avista', 'cada', 'unidade', 'unid', 'un', 'kg', 'g',
   'validade', 'venc', 'codigo', 'código', 'cod', 'ean', 'ref', 'sku',
   'leve', 'pague', 'economize', 'clube', 'cartao', 'cartão', 'socio', 'sócio',
-  'apenas', 'so', 'só', 'de', 'por', 'ate', 'até', 'no', 'em', 'ou',
+  'apenas', 'so', 'só', 'ate', 'até',
   'atacado', 'varejo', 'atacarejo', 'limite', 'peca', 'peça', 'pecas', 'peças',
+];
+
+/**
+ * Conectivos que aparecem *dentro* de nomes de produto ("Filé DE Frango",
+ * "Doce DE Leite", "Leite COM Aveia").
+ *
+ * Ficam separados das palavras de etiqueta porque são neutros: não acrescentam
+ * substância pro nome — então não contam como palavra significativa — mas
+ * também não são indício de que a linha seja ruído, então não penalizam.
+ * Tratá-los como ruído fazia "FILE DE FRANGO" perder pra "BANDEJA 500G".
+ */
+const CONNECTOR_WORDS = [
+  'de', 'do', 'da', 'dos', 'das', 'com', 'sem', 'e', 'ou',
+  'em', 'no', 'na', 'nos', 'nas', 'ao', 'aos', 'a', 'o', 'os', 'as',
+  'por', 'para', 'pra',
 ];
 
 /** Linha que é claramente um código de barras / código interno, não um nome. */
@@ -147,7 +165,11 @@ function findNameCandidates(lines: string[]): string[] {
       if (letterRatio(trimmed) < 0.4) return null;
 
       const words = normalized.split(' ');
-      const meaningful = words.filter((w) => !NOISE_WORDS.includes(w) && !/^\d+$/.test(w));
+      const noise = words.filter((w) => LABEL_NOISE_WORDS.includes(w));
+      // Conectivo não conta como substância, mas também não conta contra.
+      const meaningful = words.filter(
+        (w) => !LABEL_NOISE_WORDS.includes(w) && !CONNECTOR_WORDS.includes(w) && !/^\d+$/.test(w)
+      );
       if (meaningful.length === 0) return null;
 
       let score = 0;
@@ -156,8 +178,8 @@ function findNameCandidates(lines: string[]): string[] {
       score += Math.min(trimmed.length, 40) / 10;
       // Quanto mais alto na etiqueta, mais provável ser o nome.
       score += Math.max(0, 4 - index);
-      // Penaliza linha dominada por ruído.
-      score -= (words.length - meaningful.length) * 2;
+      // Penaliza linha dominada por ruído de etiqueta.
+      score -= noise.length * 2;
       // Etiqueta escreve o produto em CAIXA ALTA na maioria das vezes.
       if (trimmed === trimmed.toUpperCase() && letterRatio(trimmed) > 0.6) score += 2;
 
