@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useMarkets } from '@/hooks/useMarkets';
 import { useMarketSession, type MarketSession } from '@/context/MarketSessionContext';
+import { APP_MAX_WIDTH } from '@/constants/design';
 
 interface MarketPickerModalProps {
   visible: boolean;
@@ -170,8 +171,18 @@ export function MarketPickerModal({ visible, onClose, onSelected }: MarketPicker
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '80%' },
+  // O Modal do React Native renderiza fora da árvore do app, então não herda
+  // a coluna de largura máxima do layout raiz. Sem repetir o limite aqui, a
+  // folha atravessa a tela inteira no navegador.
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', alignItems: 'center' },
+  sheet: {
+    backgroundColor: '#fff',
+    width: '100%',
+    maxWidth: APP_MAX_WIDTH,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
   header: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
