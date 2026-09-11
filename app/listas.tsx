@@ -8,10 +8,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { casa } from '@/constants/casaStyles';
+import { Casa, HEADER_MENU_SLOT, Radius, Spacing, shadow } from '@/constants/design';
 
 const initialLists = [
-  { id: 1, name: 'Mercado' },
-  { id: 2, name: 'Farmácia' },
+  { id: 1, name: 'Mercado', icon: '🛒', hint: 'Compras do mês, da semana e de necessidade' },
+  { id: 2, name: 'Farmácia', icon: '💊', hint: 'Remédios e itens de cuidado' },
 ];
 
 export default function ListasScreen() {
@@ -28,12 +30,12 @@ export default function ListasScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
-        <Text style={styles.headerTitle}>Listas</Text>
+    <View style={casa.container}>
+      <View style={[casa.header, styles.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={casa.headerTitleFlex}>Listas</Text>
       </View>
 
-      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContainer}>
+      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.listContainer}>
           {lists.map(list => (
             <TouchableOpacity
@@ -42,59 +44,48 @@ export default function ListasScreen() {
               onPress={() => handleListPress(list.name)}
               activeOpacity={0.8}
             >
-              <Text style={styles.listButtonText}>{list.name}</Text>
+              <View style={styles.listIconCircle}>
+                <Text style={styles.listIcon}>{list.icon}</Text>
+              </View>
+              <View style={styles.listTextBlock}>
+                <Text style={styles.listButtonText}>{list.name}</Text>
+                <Text style={styles.listHint}>{list.hint}</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#a89080' 
-  },
-  header: {
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    backgroundColor: '#a89080',
+  header: { paddingRight: HEADER_MENU_SLOT },
+  scrollContent: { flex: 1 },
+  scrollContainer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxxl },
+  listContainer: { gap: Spacing.md + 2, width: '100%', maxWidth: 520, alignSelf: 'center' },
+  listButton: {
+    backgroundColor: Casa.surfaceWarm,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.lg,
+    ...shadow(1),
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '300',
-    fontStyle: 'italic',
-    color: '#2a2a2a',
-    letterSpacing: 1,
-  },
-  scrollContent: { 
-    flex: 1 
-  },
-  scrollContainer: { 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    paddingVertical: 50 
-  },
-  listContainer: { 
-    width: '80%', 
-    gap: 30 
-  },
-  listButton: {
-    backgroundColor: '#e8dcc8',
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    justifyContent: 'center',
+  listIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: Casa.surface,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  listButtonText: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#2a2a2a',
-    fontStyle: 'italic',
-  },
+  listIcon: { fontSize: 21, lineHeight: 26 },
+  listTextBlock: { flex: 1, gap: 2 },
+  listButtonText: { fontSize: 17, fontWeight: '600', color: Casa.ink },
+  listHint: { fontSize: 12, color: Casa.inkMuted, lineHeight: 16 },
+  chevron: { fontSize: 22, lineHeight: 24, color: Casa.inkMuted, fontWeight: '700' },
 });

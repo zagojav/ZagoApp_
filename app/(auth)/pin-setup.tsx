@@ -7,6 +7,8 @@ import { hashPin } from '@/utils/pin';
 import { useActiveProfile } from '@/hooks/useActiveProfile';
 import { PinPad } from '@/components/pin-pad';
 import { PERSON_PROFILES } from '@/constants/personProfiles';
+import { PROFILE_THEMES } from '@/constants/profileTheme';
+import { Casa, Spacing, shadow } from '@/constants/design';
 import type { PersonId } from '@/types/database';
 
 type Step = 'create' | 'confirm';
@@ -24,11 +26,13 @@ export default function PinSetupScreen() {
 
   if (!profile) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Perfil não encontrado</Text>
+      <View style={[styles.container, { backgroundColor: Casa.page }]}>
+        <Text style={[styles.title, { color: Casa.ink }]}>Perfil não encontrado</Text>
       </View>
     );
   }
+
+  const theme = PROFILE_THEMES[profile.id];
 
   const handleComplete = async (value: string) => {
     if (step === 'create') {
@@ -68,21 +72,22 @@ export default function PinSetupScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: profile.colors.primary }]}>
-      <Image source={profile.image} style={styles.avatar} />
-      <Text style={[styles.title, { color: profile.colors.secondary }]}>
-        Oi, {profile.name}!
-      </Text>
-      <Text style={[styles.subtitle, { color: profile.colors.secondary }]}>
+    <View style={[styles.container, { backgroundColor: theme.page }]}>
+      <Image source={profile.image} style={[styles.avatar, { borderColor: theme.fill }]} />
+      <Text style={[styles.title, { color: theme.onPage }]}>Oi, {profile.name}!</Text>
+      <Text style={[styles.subtitle, { color: theme.textOnPage }]}>
         {step === 'create' ? 'Crie um PIN de 4 dígitos' : 'Digite o PIN novamente para confirmar'}
       </Text>
 
       {saving ? (
-        <ActivityIndicator size="large" color={profile.colors.secondary} style={{ marginTop: 24 }} />
+        <View style={styles.padPlaceholder}>
+          <ActivityIndicator size="large" color={theme.fill} />
+        </View>
       ) : (
         <PinPad
           key={attempt}
-          accentColor={profile.colors.accent}
+          accentColor={theme.fill}
+          textColor={theme.onPage}
           onComplete={handleComplete}
           errorMessage={error}
         />
@@ -92,8 +97,16 @@ export default function PinSetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
-  avatar: { width: 90, height: 90, borderRadius: 45, marginBottom: 20 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 8 },
-  subtitle: { fontSize: 14, marginBottom: 24, textAlign: 'center' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xxl },
+  avatar: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 3,
+    marginBottom: Spacing.lg,
+    ...shadow(2),
+  },
+  title: { fontSize: 24, fontWeight: '700', marginBottom: Spacing.xs, letterSpacing: 0.3 },
+  subtitle: { fontSize: 14, marginBottom: Spacing.xl, textAlign: 'center', fontWeight: '500' },
+  padPlaceholder: { height: 282, justifyContent: 'center', alignItems: 'center' },
 });

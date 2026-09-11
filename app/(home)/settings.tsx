@@ -9,6 +9,8 @@ import { useFamily } from '@/hooks/useFamily';
 import { PinPad } from '@/components/pin-pad';
 import { DrawerMenuButton } from '@/components/drawer-menu-button';
 import { PERSON_PROFILES } from '@/constants/personProfiles';
+import { PROFILE_THEMES } from '@/constants/profileTheme';
+import { Casa, Radius, Spacing, shadow } from '@/constants/design';
 
 type Step = 'current' | 'new' | 'confirm' | 'done';
 
@@ -28,12 +30,14 @@ export default function SettingsScreen() {
 
   if (!profile) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: Casa.page }]}>
         <DrawerMenuButton />
-        <ActivityIndicator size="large" color="#6f5947" />
+        <ActivityIndicator size="large" color={Casa.accent} />
       </View>
     );
   }
+
+  const theme = PROFILE_THEMES[profile.id];
 
   const handleCurrentPin = async (value: string) => {
     if (!member) return;
@@ -81,51 +85,76 @@ export default function SettingsScreen() {
     }
   };
 
+  /** Passo 1 de 3, 2 de 3... — deixa claro onde a pessoa está no fluxo. */
+  const stepIndex = step === 'current' ? 0 : step === 'new' ? 1 : 2;
+
   return (
-    <View style={[styles.container, { backgroundColor: profile.colors.primary }]}>
+    <View style={[styles.container, { backgroundColor: theme.page }]}>
       <DrawerMenuButton />
-      <Text style={[styles.title, { color: profile.colors.secondary }]}>Configurações</Text>
-      <Text style={[styles.subtitle, { color: profile.colors.secondary }]}>
+      <Text style={[styles.title, { color: theme.onPage }]}>Configurações</Text>
+      <Text style={[styles.subtitle, { color: theme.textOnPage }]}>
         Alterar PIN de {profile.name}
       </Text>
 
+      {step !== 'done' && (
+        <View style={styles.stepper}>
+          {[0, 1, 2].map((i) => (
+            <View
+              key={i}
+              style={[
+                styles.stepDot,
+                { backgroundColor: i <= stepIndex ? theme.fill : theme.track },
+                i === stepIndex && styles.stepDotCurrent,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
       {step === 'current' && (
         <>
-          <Text style={[styles.stepLabel, { color: profile.colors.secondary }]}>Digite seu PIN atual</Text>
-          <PinPad key={attempt} accentColor={profile.colors.accent} onComplete={handleCurrentPin} errorMessage={error} disabled={loading} />
+          <Text style={[styles.stepLabel, { color: theme.onPage }]}>Digite seu PIN atual</Text>
+          <PinPad key={attempt} accentColor={theme.fill} textColor={theme.onPage} onComplete={handleCurrentPin} errorMessage={error} disabled={loading} />
         </>
       )}
 
       {step === 'new' && (
         <>
-          <Text style={[styles.stepLabel, { color: profile.colors.secondary }]}>Digite o novo PIN</Text>
-          <PinPad key={attempt} accentColor={profile.colors.accent} onComplete={handleNewPin} errorMessage={error} />
+          <Text style={[styles.stepLabel, { color: theme.onPage }]}>Digite o novo PIN</Text>
+          <PinPad key={attempt} accentColor={theme.fill} textColor={theme.onPage} onComplete={handleNewPin} errorMessage={error} />
         </>
       )}
 
       {step === 'confirm' && (
         <>
-          <Text style={[styles.stepLabel, { color: profile.colors.secondary }]}>Confirme o novo PIN</Text>
+          <Text style={[styles.stepLabel, { color: theme.onPage }]}>Confirme o novo PIN</Text>
           {saving ? (
-            <ActivityIndicator size="large" color={profile.colors.secondary} style={{ marginTop: 24 }} />
+            <View style={styles.padPlaceholder}>
+              <ActivityIndicator size="large" color={theme.fill} />
+            </View>
           ) : (
-            <PinPad key={attempt} accentColor={profile.colors.accent} onComplete={handleConfirmPin} errorMessage={error} />
+            <PinPad key={attempt} accentColor={theme.fill} textColor={theme.onPage} onComplete={handleConfirmPin} errorMessage={error} />
           )}
         </>
       )}
 
       {step === 'done' && (
         <>
-          <Text style={[styles.stepLabel, { color: profile.colors.secondary }]}>PIN atualizado com sucesso!</Text>
-          <TouchableOpacity style={[styles.doneBtn, { backgroundColor: profile.colors.accent }]} onPress={goHome}>
-            <Text style={styles.doneBtnText}>Voltar para a Página Inicial</Text>
+          <Text style={[styles.doneIcon]}>✅</Text>
+          <Text style={[styles.stepLabel, { color: theme.onPage }]}>PIN atualizado com sucesso!</Text>
+          <TouchableOpacity
+            style={[styles.doneBtn, { backgroundColor: theme.accent }]}
+            onPress={goHome}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.doneBtnText, { color: theme.onAccent }]}>Voltar para a Página Inicial</Text>
           </TouchableOpacity>
         </>
       )}
 
       {step !== 'done' && (
-        <TouchableOpacity style={styles.cancelLink} onPress={goHome}>
-          <Text style={[styles.cancelLinkText, { color: profile.colors.secondary }]}>Cancelar</Text>
+        <TouchableOpacity style={styles.cancelLink} onPress={goHome} activeOpacity={0.7}>
+          <Text style={[styles.cancelLinkText, { color: theme.textOnPage }]}>Cancelar</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -133,12 +162,23 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 4 },
-  subtitle: { fontSize: 13, marginBottom: 24, textAlign: 'center' },
-  stepLabel: { fontSize: 14, marginBottom: 16, textAlign: 'center' },
-  doneBtn: { marginTop: 16, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 10 },
-  doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  cancelLink: { marginTop: 20 },
-  cancelLinkText: { fontSize: 13, textDecorationLine: 'underline' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xxl },
+  title: { fontSize: 24, fontWeight: '700', marginBottom: Spacing.xs, letterSpacing: 0.3 },
+  subtitle: { fontSize: 13, marginBottom: Spacing.lg, textAlign: 'center', fontWeight: '500' },
+  stepper: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  stepDot: { width: 20, height: 4, borderRadius: 2 },
+  stepDotCurrent: { width: 28 },
+  stepLabel: { fontSize: 14, marginBottom: Spacing.lg, textAlign: 'center', fontWeight: '600' },
+  padPlaceholder: { height: 282, justifyContent: 'center', alignItems: 'center' },
+  doneIcon: { fontSize: 44, lineHeight: 52, marginBottom: Spacing.sm },
+  doneBtn: {
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.md + 2,
+    paddingHorizontal: Spacing.xxl,
+    borderRadius: Radius.md,
+    ...shadow(1),
+  },
+  doneBtnText: { fontWeight: '700', fontSize: 15 },
+  cancelLink: { marginTop: Spacing.xl, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md },
+  cancelLinkText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
 });

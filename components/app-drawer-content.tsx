@@ -1,16 +1,21 @@
-import { View, Text, TouchableOpacity, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Image, StyleSheet } from 'react-native';
 import { DrawerContentScrollView, type DrawerContentComponentProps } from '@react-navigation/drawer';
 import { router } from 'expo-router';
 import { useActiveProfile } from '@/hooks/useActiveProfile';
+import { useFamily } from '@/hooks/useFamily';
 import { PERSON_PROFILES } from '@/constants/personProfiles';
+import { Radius, Spacing, shadow } from '@/constants/design';
 
 const DRAWER_TEXT_COLOR = '#FFFFFF';
 
 export function AppDrawerContent(props: DrawerContentComponentProps) {
   const { activeProfileId, clearActiveProfile } = useActiveProfile();
+  const { members } = useFamily();
   const profile = activeProfileId ? PERSON_PROFILES[activeProfileId] : null;
+  const member = members.find((m) => m.id === activeProfileId);
   const bg = profile?.colors.primary ?? '#6f5947';
   const hover = profile?.colors.hover ?? 'rgba(255,255,255,0.15)';
+  const currentRoute = props.state.routeNames[props.state.index];
 
   const handleSair = async () => {
     await clearActiveProfile();
@@ -30,22 +35,43 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContent} style={{ backgroundColor: bg }}>
         <View style={styles.logoBlock}>
           <Text style={styles.logoTitle}>ZagoApp</Text>
-          {profile ? <Text style={styles.logoSubtitle}>Olá, {profile.name}</Text> : null}
+          {profile ? (
+            <View style={styles.profileRow}>
+              <Image
+                source={member?.photoUrl ? { uri: member.photoUrl } : profile.image}
+                style={[styles.profileAvatar, { borderColor: profile.colors.accent }]}
+              />
+              <Text style={styles.logoSubtitle} numberOfLines={1}>
+                Olá, {profile.name}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        {items.map((item) => (
-          <Pressable
-            key={item.screen}
-            style={({ pressed }) => [styles.item, pressed && { backgroundColor: hover }]}
-            onPress={() => props.navigation.navigate(item.screen)}
-          >
-            <Text style={styles.itemIcon}>{item.icon}</Text>
-            <Text style={styles.itemText}>{item.label}</Text>
-          </Pressable>
-        ))}
+        <View style={styles.itemsBlock}>
+          {items.map((item) => {
+            const isActive = currentRoute === item.screen;
+            return (
+              <Pressable
+                key={item.screen}
+                style={({ pressed }) => [
+                  styles.item,
+                  isActive && { backgroundColor: hover },
+                  pressed && !isActive && { backgroundColor: hover, opacity: 0.75 },
+                ]}
+                onPress={() => props.navigation.navigate(item.screen)}
+              >
+                {/* Largura fixa no ícone: os rótulos ficam todos na mesma
+                    coluna, em vez de dançarem conforme a largura do emoji. */}
+                <Text style={styles.itemIcon}>{item.icon}</Text>
+                <Text style={[styles.itemText, isActive && styles.itemTextActive]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </DrawerContentScrollView>
 
-      <TouchableOpacity style={styles.sairBtn} onPress={handleSair} activeOpacity={0.8}>
+      <TouchableOpacity style={styles.sairBtn} onPress={handleSair} activeOpacity={0.85}>
         <Text style={styles.sairIcon}>🚪</Text>
         <Text style={styles.sairText}>Sair</Text>
       </TouchableOpacity>
@@ -57,26 +83,45 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingTop: 0 },
   logoBlock: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.15)',
-    marginBottom: 8,
+    borderBottomColor: 'rgba(255,255,255,0.14)',
+    marginBottom: Spacing.md,
   },
-  logoTitle: { fontSize: 24, fontWeight: '300', fontStyle: 'italic', color: DRAWER_TEXT_COLOR, letterSpacing: 1 },
-  logoSubtitle: { fontSize: 13, color: DRAWER_TEXT_COLOR, marginTop: 4, opacity: 0.85 },
-  item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
-  itemIcon: { fontSize: 18, marginRight: 14 },
-  itemText: { fontSize: 15, color: DRAWER_TEXT_COLOR, fontWeight: '500' },
+  logoTitle: {
+    fontSize: 24,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    color: DRAWER_TEXT_COLOR,
+    letterSpacing: 1,
+  },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm + 2, marginTop: Spacing.md },
+  profileAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 2 },
+  logoSubtitle: { flex: 1, fontSize: 14, color: DRAWER_TEXT_COLOR, opacity: 0.9, fontWeight: '500' },
+  itemsBlock: { paddingHorizontal: Spacing.md },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md + 2,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.xs,
+  },
+  itemIcon: { fontSize: 17, lineHeight: 22, width: 28, textAlign: 'center', marginRight: Spacing.sm + 2 },
+  itemText: { flex: 1, fontSize: 15, color: DRAWER_TEXT_COLOR, fontWeight: '500', opacity: 0.85 },
+  itemTextActive: { fontWeight: '700', opacity: 1 },
   sairBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 16,
-    paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: '#e53935',
+    margin: Spacing.lg,
+    paddingVertical: Spacing.md + 2,
+    borderRadius: Radius.md,
+    backgroundColor: '#C0392B',
+    ...shadow(1),
   },
-  sairIcon: { fontSize: 16, marginRight: 8 },
+  sairIcon: { fontSize: 15, lineHeight: 18, marginRight: Spacing.sm },
   sairText: { fontSize: 15, color: '#fff', fontWeight: '700' },
 });

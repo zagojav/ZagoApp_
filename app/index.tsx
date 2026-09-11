@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useActiveProfile } from '@/hooks/useActiveProfile';
 import { ensureFamilySeeded, ensurePetsSeeded } from '@/services/seed';
 import { withTimeout } from '@/utils/withTimeout';
+import { Casa, Radius, Spacing, Type, shadow } from '@/constants/design';
 
 export default function Index() {
   const { user, loading: authLoading, error: authError } = useAuth();
@@ -28,11 +29,14 @@ export default function Index() {
   if (fatalError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorTitle}>Não foi possível conectar</Text>
-        <Text style={styles.errorMessage}>{fatalError.message}</Text>
-        <Text style={styles.errorHint}>
-          Confira sua conexão e se as regras do Firestore já foram publicadas.
-        </Text>
+        <View style={styles.errorCard}>
+          <Text style={styles.errorIcon}>📡</Text>
+          <Text style={styles.errorTitle}>Não foi possível conectar</Text>
+          <Text style={styles.errorMessage}>{fatalError.message}</Text>
+          <Text style={styles.errorHint}>
+            Confira sua conexão e se as regras do Firestore já foram publicadas.
+          </Text>
+        </View>
       </View>
     );
   }
@@ -40,7 +44,8 @@ export default function Index() {
   if (authLoading || profileLoading || (user && !seeded)) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#6f5947" />
+        <Text style={styles.brand}>ZagoApp</Text>
+        <ActivityIndicator size="large" color={Casa.accent} style={{ marginTop: Spacing.xl }} />
       </View>
     );
   }
@@ -57,10 +62,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#a89080',
-    paddingHorizontal: 24,
+    backgroundColor: Casa.page,
+    paddingHorizontal: Spacing.xxl,
   },
-  errorTitle: { fontSize: 18, fontWeight: '700', color: '#2a2a2a', marginBottom: 8 },
-  errorMessage: { fontSize: 13, color: '#4a4a4a', textAlign: 'center', marginBottom: 12 },
-  errorHint: { fontSize: 12, color: '#5a4a40', textAlign: 'center', fontStyle: 'italic' },
+  brand: { ...Type.screenTitle, fontSize: 26, color: Casa.ink },
+  errorCard: {
+    backgroundColor: Casa.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xxl,
+    alignItems: 'center',
+    maxWidth: 420,
+    ...shadow(2),
+  },
+  errorIcon: { fontSize: 34, lineHeight: 40, marginBottom: Spacing.md },
+  errorTitle: { fontSize: 17, fontWeight: '700', color: Casa.ink, marginBottom: Spacing.sm, textAlign: 'center' },
+  errorMessage: { fontSize: 13, color: Casa.inkMuted, textAlign: 'center', marginBottom: Spacing.md, lineHeight: 19 },
+  errorHint: { fontSize: 12, color: Casa.inkFaint, textAlign: 'center', lineHeight: 17 },
 });

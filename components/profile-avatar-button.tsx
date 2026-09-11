@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFamily } from '@/hooks/useFamily';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 import { PERSON_PROFILES } from '@/constants/personProfiles';
+import { shadow } from '@/constants/design';
 import type { PersonId } from '@/types/database';
 
 interface ProfileAvatarButtonProps {
@@ -20,9 +21,11 @@ export function ProfileAvatarButton({ profileId }: ProfileAvatarButtonProps) {
   return (
     <>
       <TouchableOpacity
-        style={[styles.button, { top: insets.top + 6, borderColor: profile.colors.accent }]}
+        style={[styles.button, { top: insets.top + 10, borderColor: profile.colors.accent }]}
         onPress={() => setVisible(true)}
-        activeOpacity={0.8}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel={`Foto de ${profile.name}`}
       >
         <Image source={member?.photoUrl ? { uri: member.photoUrl } : profile.image} style={styles.avatar} />
       </TouchableOpacity>
@@ -43,6 +46,7 @@ export function ProfileAvatarButton({ profileId }: ProfileAvatarButtonProps) {
 const styles = StyleSheet.create({
   button: {
     position: 'absolute',
+    // 12 (margem) + 36 (botão de menu) + 8 (respiro) = 56
     right: 56,
     width: 36,
     height: 36,
@@ -50,6 +54,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     overflow: 'hidden',
     zIndex: 999,
+    ...shadow(1),
   },
   avatar: { width: '100%', height: '100%' },
 });
